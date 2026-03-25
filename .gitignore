@@ -3,5 +3,5 @@
 
 # 2. 开绿灯（豁免）：只允许上传下面这三个！
 !ai-guide-backend/
-!ai-guide-website/
+!ai-guide-frontend/
 !.gitignore
