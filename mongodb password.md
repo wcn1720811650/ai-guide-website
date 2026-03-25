@@ -1,0 +1,4 @@
+mmmapleleave_db_user
+uCiNmTimu2gkizrn
+
+mongodb+srv://mmmapleleave_db_user:uCiNmTimu2gkizrn@aiguidecluster.olmmuvf.mongodb.net/?appName=AIGuideCluster

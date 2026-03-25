@@ -1,0 +1,30 @@
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+// 引入页面组件
+import Home from '../views/Home.vue'
+import Article from '../views/Article.vue'
+import ArticleList from '@/views/ArticleList.vue'
+// 🌟 重点在这里：声明 routes 是一个 RouteRecordRaw 类型的数组
+const routes: Array<RouteRecordRaw> = [
+  {
+    path: '/',
+    name: 'Home',
+    component: Home
+  },
+  {
+    path: '/category/:id',
+    name: 'Category',
+    component: ArticleList
+  },
+  {
+    path: '/article/:id', 
+    name: 'Article',
+    component: Article
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+export default router
