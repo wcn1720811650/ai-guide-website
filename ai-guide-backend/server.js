@@ -71,6 +71,36 @@ app.get('/api/articles/:id', async (req, res) => {
   }
 });
 
+// ==========================================
+// 🌟 新增：站长专属发布接口 (POST 请求)
+// 接收前端表单传来的新文章数据，存入 MongoDB
+// ==========================================
+app.post('/api/articles', async (req, res) => {
+  try {
+    // req.body 就是前端表单填写的那些数据
+    const newArticleData = req.body;
+
+    // 自动补全一些后台默认数据
+    const fullArticleData = {
+      ...newArticleData,
+      date: new Date().toISOString().split('T')[0], // 自动生成今天的日期 (YYYY-MM-DD)
+      views: 0 // 新文章阅读量默认为 0
+    };
+
+    // 使用 Mongoose 创建一条新记录
+    const createdArticle = await Article.create(fullArticleData);
+    
+    // 成功后，给前端返回一个成功的信号
+    res.status(201).json({ 
+      message: '✅ 发布成功！', 
+      data: createdArticle 
+    });
+  } catch (error) {
+    console.error('发布失败:', error);
+    res.status(500).json({ message: '发布失败，请检查服务器' });
+  }
+});
+
 // // ==========================================
 // // 4. 🌟 魔法接口：一键初始化假数据
 // // 因为现在你的云数据库是空的，我们写个临时接口帮你把数据塞进去

@@ -3,6 +3,8 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import Home from '../views/Home.vue'
 import Article from '../views/Article.vue'
 import ArticleList from '@/views/ArticleList.vue'
+import Admin from '@/views/Admin.vue'
+import NotFound from '@/views/NotFound.vue'
 // 🌟 重点在这里：声明 routes 是一个 RouteRecordRaw 类型的数组
 const routes: Array<RouteRecordRaw> = [
   {
@@ -19,6 +21,16 @@ const routes: Array<RouteRecordRaw> = [
     path: '/article/:id', 
     name: 'Article',
     component: Article
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: Admin
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: NotFound
   }
 ]
 
