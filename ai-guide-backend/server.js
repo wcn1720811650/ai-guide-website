@@ -101,6 +101,42 @@ app.post('/api/articles', async (req, res) => {
   }
 });
 
+// ==========================================
+// ✏️ 修改文章接口 (PUT)
+// ==========================================
+app.put('/api/articles/:id', async (req, res) => {
+  try {
+    const articleId = req.params.id;
+    const updateData = req.body;
+    
+    // 找到对应 id 的文章，并用新数据覆盖它
+    // { new: true } 的意思是返回修改后的最新数据
+    const updatedArticle = await Article.findOneAndUpdate({ id: articleId }, updateData, { new: true });
+    
+    if (updatedArticle) {
+      res.json({ message: '✅ 修改成功！', data: updatedArticle });
+    } else {
+      res.status(404).json({ message: '未找到该文章' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: '修改失败' });
+  }
+});
+
+// ==========================================
+// 🗑️ 删除文章接口 (DELETE)
+// ==========================================
+app.delete('/api/articles/:id', async (req, res) => {
+  try {
+    const articleId = req.params.id;
+    // 直接让数据库抹除这条记录
+    await Article.findOneAndDelete({ id: articleId });
+    res.json({ message: '🗑️ 文章已彻底删除！' });
+  } catch (error) {
+    res.status(500).json({ message: '删除失败' });
+  }
+});
+
 // // ==========================================
 // // 4. 🌟 魔法接口：一键初始化假数据
 // // 因为现在你的云数据库是空的，我们写个临时接口帮你把数据塞进去
