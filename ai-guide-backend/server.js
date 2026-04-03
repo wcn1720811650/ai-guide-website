@@ -41,15 +41,14 @@ const Article = mongoose.model('Article', articleSchema);
 // 获取文章列表接口
 app.get('/api/articles', async (req, res) => {
   try {
-    const categoryId = req.query.category;
-    const keyword = req.query.keyword; // 接收前端传来的搜索词
+    const { category, keyword, page = 1, limit = 6 } = req.query;
     
     // 初始化一个空的查询条件
     const filter = {};
 
     // 1. 如果有分类，加上分类条件
-    if (categoryId) {
-      filter.categoryId = categoryId;
+    if (category) {
+      filter.categoryId = category;
     }
 
     // 2. 如果带有关键字，开启正则模糊搜索
@@ -61,11 +60,25 @@ app.get('/api/articles', async (req, res) => {
       ];
     }
 
-    // 去数据库里按条件搜，并按发布日期倒序排列 (最新的在前面)
-    const articles = await Article.find(filter).sort({ _id: -1 }); 
-    res.json(articles);
+    const skip = (parseInt(page) - 1) * parseInt(limit); // 计算跳过多少条数据
+
+    // 1. 查询当前页的数据
+    const articles = await Article.find(filter)
+      .sort({ _id: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    // 2. 查询总条数（为了让前端知道一共有多少页）
+    const total = await Article.countDocuments(filter);
+    
+    res.json({
+      articles, // 当前页的数据
+      total,    // 总条数
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
   } catch (error) {
-    res.status(500).json({ message: '服务器开小差了' });
+    res.status(500).json({ message: '服务器分页查询失败' });
   }
 });
 

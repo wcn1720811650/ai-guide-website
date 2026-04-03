@@ -5,31 +5,49 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
 const articles = ref([])
-// 🌟 1. 新增：绑定搜索框的关键字
+// 绑定搜索框的关键字
 const searchQuery = ref('')
-// 🌟 2. 新增：用来装倒计时器的“盒子”
+// 用来装倒计时器的“盒子”
 let searchTimeout: any = null
 
 const hasSearched = ref(false)
+
+
+// 分页相关状态
+const currentPage = ref(1) // 当前页码
+const pageSize = ref(6)    // 每页显示 6 条
+const totalArticles = ref(0) // 总数
 
 // 核心拉取数据函数（把关键字参数带上！）
 const fetchArticles = async () => {
   try {
     const res = await axios.get('http://localhost:3000/api/articles', {
       params: {
-        keyword: searchQuery.value // 把用户输的词发给后端
-        // category: 'basic' (如果你有分类切换，也带上)
+        keyword: searchQuery.value, // 把用户输的词发给后端
+        page: currentPage.value, // 🌟 发送当前页码
+        limit: pageSize.value    // 🌟 发送每页条数
+        // category: 'basic' (如果有分类切换)
       }
     })
-    articles.value = res.data
+    articles.value = res.data.articles 
+    totalArticles.value = res.data.total
     hasSearched.value = true
   } catch (error) {
     console.error('拉取列表失败', error)
   }
 }
 
-// 🌟 3. 核心魔法：防抖搜索函数
+// 🌟 新增：页码改变时的处理函数
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  fetchArticles() // 切换页码后，重新拉取数据
+  // 顺便滚回搜索框的位置，体验更好
+  window.scrollTo({ top: 600, behavior: 'smooth' }) 
+}
+
+// 防抖搜索函数
 const onSearchInput = () => {
+  currentPage.value = 1 // 🌟 每次重新搜索，都必须回到第 1 页
   // 每次用户敲击键盘，立刻把上一次的倒计时砸碎
   if (searchTimeout) clearTimeout(searchTimeout)
 
@@ -37,6 +55,7 @@ const onSearchInput = () => {
   if (!searchQuery.value.trim()) {
     articles.value = [] // 立刻清空下方的文章列表
     hasSearched.value = false // 重置搜索状态
+    totalArticles.value = 0
     return 
   }
 
@@ -144,6 +163,16 @@ const categories = [
         </router-link>
       </a-col>
     </a-row>
+
+    <div v-if="totalArticles > pageSize" style="margin-top: 40px; text-align: center;">
+      <a-pagination
+        v-model:current="currentPage"
+        :total="totalArticles"
+        :pageSize="pageSize"
+        show-less-items
+        @change="handlePageChange"
+      />
+    </div>
 
     <a-empty 
       v-if="hasSearched && articles.length === 0" 

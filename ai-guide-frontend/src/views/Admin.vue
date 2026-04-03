@@ -45,7 +45,7 @@ const fetchArticles = async () => {
   isLoadingTable.value = true
   try {
     const res = await axios.get('http://localhost:3000/api/articles')
-    articles.value = res.data
+    articles.value = res.data.articles
   } catch (error) {
     message.error('获取文章列表失败')
   } finally {
