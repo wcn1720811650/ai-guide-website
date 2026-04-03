@@ -42,9 +42,27 @@ const Article = mongoose.model('Article', articleSchema);
 app.get('/api/articles', async (req, res) => {
   try {
     const categoryId = req.query.category;
-    // 如果有分类，就按分类查；如果没有，就查全部 (用 Article.find)
-    const filter = categoryId ? { categoryId: categoryId } : {};
-    const articles = await Article.find(filter); 
+    const keyword = req.query.keyword; // 接收前端传来的搜索词
+    
+    // 初始化一个空的查询条件
+    const filter = {};
+
+    // 1. 如果有分类，加上分类条件
+    if (categoryId) {
+      filter.categoryId = categoryId;
+    }
+
+    // 2. 如果带有关键字，开启正则模糊搜索
+    if (keyword) {
+      filter.$or = [
+        // $regex 代表正则表达式，$options: 'i' 代表不区分大小写
+        { title: { $regex: keyword, $options: 'i' } }, 
+        { desc: { $regex: keyword, $options: 'i' } }
+      ];
+    }
+
+    // 去数据库里按条件搜，并按发布日期倒序排列 (最新的在前面)
+    const articles = await Article.find(filter).sort({ _id: -1 }); 
     res.json(articles);
   } catch (error) {
     res.status(500).json({ message: '服务器开小差了' });

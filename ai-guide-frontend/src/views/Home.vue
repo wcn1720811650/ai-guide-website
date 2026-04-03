@@ -1,6 +1,52 @@
 <script setup lang="ts">
 import { Bot, Zap, Coffee, BookOpen, Briefcase, Smile } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+
+const articles = ref([])
+// 🌟 1. 新增：绑定搜索框的关键字
+const searchQuery = ref('')
+// 🌟 2. 新增：用来装倒计时器的“盒子”
+let searchTimeout: any = null
+
+const hasSearched = ref(false)
+
+// 核心拉取数据函数（把关键字参数带上！）
+const fetchArticles = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/api/articles', {
+      params: {
+        keyword: searchQuery.value // 把用户输的词发给后端
+        // category: 'basic' (如果你有分类切换，也带上)
+      }
+    })
+    articles.value = res.data
+    hasSearched.value = true
+  } catch (error) {
+    console.error('拉取列表失败', error)
+  }
+}
+
+// 🌟 3. 核心魔法：防抖搜索函数
+const onSearchInput = () => {
+  // 每次用户敲击键盘，立刻把上一次的倒计时砸碎
+  if (searchTimeout) clearTimeout(searchTimeout)
+
+  // 如果用户把搜索框删空了
+  if (!searchQuery.value.trim()) {
+    articles.value = [] // 立刻清空下方的文章列表
+    hasSearched.value = false // 重置搜索状态
+    return 
+  }
+
+  // 重新设定一个 500 毫秒（半秒）的倒计时
+  searchTimeout = setTimeout(() => {
+    // 只有当用户半秒钟都不再敲键盘了，才会走到这里，真正发送请求！
+    fetchArticles() 
+  }, 500)
+}
+
 const router = useRouter()
 // 定义一下教程分类的数据（这里把颜色改为了直接的 HEX 色值，兼容 Antdv）
 const categories = [
@@ -29,36 +75,38 @@ const categories = [
 </script>
 
 <template>
-  <div style="text-align: center; padding: 20px 0;">
+  <div style="max-width: 1000px; margin: 0 auto; padding: 20px;">
     
-    <div style="margin-bottom: 24px;">
-      <Bot :size="64" color="#10b981" />
-    </div>
-    
-    <a-typography-title :level="1" style="font-weight: 900; margin-bottom: 24px;">
-      不再害怕，<span style="color: #10b981;">轻松驾驭 AI</span>
-    </a-typography-title>
-    
-    <a-typography-paragraph style="font-size: 18px; color: #666; max-width: 600px; margin: 0 auto 40px; line-height: 1.8;">
-      这里没有复杂的算法和晦涩的代码。我们只讲大白话，提供直接能用的模板，核心目标只有一个：<strong>帮你提早下班，享受生活。</strong>
-    </a-typography-paragraph>
+    <div style="text-align: center; padding: 40px 0 20px;">
+      <div style="margin-bottom: 24px;">
+        <Bot :size="64" color="#10b981" />
+      </div>
+      
+      <a-typography-title :level="1" style="font-weight: 900; margin-bottom: 24px;">
+        不再害怕，<span style="color: #10b981;">轻松驾驭 AI</span>
+      </a-typography-title>
+      
+      <a-typography-paragraph style="font-size: 18px; color: #666; max-width: 600px; margin: 0 auto 40px; line-height: 1.8;">
+        这里没有复杂的算法和晦涩的代码。我们只讲大白话，提供直接能用的模板，核心目标只有一个：<strong>帮你提早下班，享受生活。</strong>
+      </a-typography-paragraph>
 
-    <a-space size="large" style="margin-bottom: 80px;">
-      <router-link to="/article/hello-ai">
-        <a-button type="primary" size="large" style="background-color: #10b981; border-color: #10b981; border-radius: 8px; height: 50px; padding: 0 30px; font-size: 16px;">
-          <template #icon><Zap :size="18" style="margin-right: 6px; vertical-align: -4px;"/></template>
-          开始第一课
+      <a-space size="large" style="margin-bottom: 40px;">
+        <router-link to="/article/hello-ai">
+          <a-button type="primary" size="large" style="background-color: #10b981; border-color: #10b981; border-radius: 8px; height: 50px; padding: 0 30px; font-size: 16px;">
+            <template #icon><Zap :size="18" style="margin-right: 6px; vertical-align: -4px;"/></template>
+            开始第一课
+          </a-button>
+        </router-link>
+        <a-button size="large" style="border-radius: 8px; height: 50px; padding: 0 30px; font-size: 16px;">
+          <template #icon><Coffee :size="18" style="margin-right: 6px; vertical-align: -4px;"/></template>
+          先随便逛逛
         </a-button>
-      </router-link>
-      <a-button size="large" style="border-radius: 8px; height: 50px; padding: 0 30px; font-size: 16px;">
-        <template #icon><Coffee :size="18" style="margin-right: 6px; vertical-align: -4px;"/></template>
-        先随便逛逛
-      </a-button>
-    </a-space>
+      </a-space>
+    </div>
 
     <a-divider style="font-size: 20px; color: #333; font-weight: bold;">探索适合你的 AI 玩法</a-divider>
 
-    <a-row :gutter="[24, 24]" style="margin-top: 40px; text-align: left;">
+    <a-row :gutter="[24, 24]" style="margin-top: 24px; text-align: left;">
       <a-col :xs="24" :sm="24" :md="8" v-for="cat in categories" :key="cat.id">
         <a-card hoverable style="border-radius: 12px; height: 100%; border: 1px solid #eaeaea;" 
             @click="router.push(`/category/${cat.id}`)">
@@ -73,6 +121,35 @@ const categories = [
         </a-card>
       </a-col>
     </a-row>
+
+    <a-divider style="font-size: 20px; color: #333; font-weight: bold; margin-top: 60px;">全部秘籍</a-divider>
+
+    <div style="margin-bottom: 32px; text-align: center;">
+      <a-input-search
+        v-model:value="searchQuery"
+        placeholder="搜点什么... (比如: AI, 效率, 周报)"
+        size="large"
+        @input="onSearchInput" 
+        style="max-width: 500px; border-radius: 8px;"
+      />
+    </div>
+
+    <a-row :gutter="[16, 16]">
+      <a-col :span="24" v-for="article in articles" :key="article.id">
+        <router-link :to="`/article/${article.id}`" style="text-decoration: none;">
+          <a-card hoverable style="border-radius: 8px; border: 1px solid #f0f0f0;">
+            <h2 style="color: #1f2937; margin-bottom: 8px;">{{ article.title }}</h2>
+            <p style="color: #6b7280; margin: 0;">{{ article.desc }}</p>
+          </a-card>
+        </router-link>
+      </a-col>
+    </a-row>
+
+    <a-empty 
+      v-if="hasSearched && articles.length === 0" 
+      description="哎呀，没有搜到相关的秘籍~ 换个词试试？" 
+      style="margin-top: 40px;" 
+    />
 
   </div>
 </template>
