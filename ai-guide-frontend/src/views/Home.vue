@@ -3,8 +3,9 @@ import { Bot, Zap, Coffee, BookOpen, Briefcase, Smile } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import type {Article} from '../types/index.ts'
 
-const articles = ref([])
+const articles = ref<Article[]>([])
 // 绑定搜索框的关键字
 const searchQuery = ref('')
 // 用来装倒计时器的“盒子”

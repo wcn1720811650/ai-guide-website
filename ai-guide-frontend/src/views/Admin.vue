@@ -2,6 +2,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import axios from 'axios'
+import type { Article } from '../types/index'
 
 // 🔒 密码锁逻辑
 const isAuthorized = ref(false)
@@ -18,7 +19,7 @@ const checkAuth = () => {
 }
 
 // 📊 表格数据和状态
-const articles = ref([])
+const articles = ref<Article[]>([])
 const isLoadingTable = ref(false)
 const isSubmitting = ref(false)
 
@@ -78,7 +79,7 @@ const onFinish = async () => {
 }
 
 // 点击表格里的“编辑”按钮
-const handleEdit = (record: any) => {
+const handleEdit = (record: Article) => {
   isEditing.value = true
   editingOriginalId.value = record.id // 记住要修改谁
   // 把表格里的数据填充到上面的表单里
