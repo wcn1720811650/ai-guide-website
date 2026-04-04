@@ -1,119 +1,127 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import axios from 'axios'
 import type { Article } from '../types/index'
 
-// 🔒 密码锁逻辑
+// 🔒 登录状态
 const isAuthorized = ref(false)
 const secretKey = ref('')
-const checkAuth = () => {
-  if (secretKey.value === 'ai2026') { // 你的密码
+const token = ref('') // 存 JWT token
+
+const checkAuth = async () => {
+  try {
+    const res = await axios.post('http://localhost:3000/api/login', {
+      password: secretKey.value
+    })
+    token.value = res.data.token
     isAuthorized.value = true
     message.success('口令正确，欢迎站长！')
-    fetchArticles() // 解锁后立刻去拉取最新数据表！
-  } else {
+    fetchArticles()
+  } catch {
     message.error('警告：口令错误！')
     secretKey.value = ''
   }
 }
 
-// 📊 表格数据和状态
+// 统一的鉴权 header，避免每次手写
+const authHeader = () => ({ headers: { Authorization: `Bearer ${token.value}` } })
+
+// 统一的错误处理，判断是否 token 过期
+const handleError = (error: any, fallbackMsg: string) => {
+  if (error.response?.status === 401) {
+    isAuthorized.value = false
+    token.value = ''
+    message.warning('登录已过期，请重新验证口令')
+  } else {
+    message.error(fallbackMsg)
+  }
+}
+
+// 表格和表单状态（不变）
 const articles = ref<Article[]>([])
 const isLoadingTable = ref(false)
 const isSubmitting = ref(false)
-
-// 标识当前是在“发布新文章”还是在“修改旧文章”
-const isEditing = ref(false) 
-const editingOriginalId = ref('') // 记住正在修改的文章原本的 ID
-
-// 定义表格的列
+const isEditing = ref(false)
+const editingOriginalId = ref('')
 const columns = [
-  { title: '文章ID (英文)', dataIndex: 'id', key: 'id' },
+  { title: '文章ID', dataIndex: 'id', key: 'id' },
   { title: '标题', dataIndex: 'title', key: 'title' },
   { title: '分类', dataIndex: 'categoryId', key: 'categoryId' },
   { title: '阅读量', dataIndex: 'views', key: 'views' },
-  { title: '操作', key: 'action' } // 这一列用来放按钮
+  { title: '操作', key: 'action' }
 ]
-
-// 📝 表单数据
 const formState = reactive({
   id: '', title: '', desc: '', categoryId: 'basic', author: '站长'
 })
 
-// 🔍 查：拉取所有文章列表
+// 读取（不需要 token，是公开接口）
 const fetchArticles = async () => {
   isLoadingTable.value = true
   try {
     const res = await axios.get('http://localhost:3000/api/articles')
     articles.value = res.data.articles
-  } catch (error) {
+  } catch {
     message.error('获取文章列表失败')
   } finally {
     isLoadingTable.value = false
   }
 }
 
-// 提交表单（智能判断是 新增 还是 修改）
+// 新增 / 修改
 const onFinish = async () => {
   isSubmitting.value = true
   try {
     if (isEditing.value) {
-      // ✏️ 修改模式：调用 PUT 接口
-      await axios.put(`http://localhost:3000/api/articles/${editingOriginalId.value}`, formState)
+      await axios.put(
+        `http://localhost:3000/api/articles/${editingOriginalId.value}`,
+        formState,
+        authHeader() // 👈
+      )
       message.success('✅ 文章修改成功！')
     } else {
-      // ➕ 新增模式：调用 POST 接口
-      await axios.post('http://localhost:3000/api/articles', formState)
+      await axios.post('http://localhost:3000/api/articles', formState, authHeader()) // 👈
       message.success('🎉 新文章发布成功！')
     }
-    
-    // 成功后：清空表单、退出编辑模式、刷新下方的表格
     resetForm()
     fetchArticles()
   } catch (error) {
-    message.error('操作失败，请检查后端')
+    handleError(error, '操作失败，请检查后端')
   } finally {
     isSubmitting.value = false
   }
 }
 
-// 点击表格里的“编辑”按钮
+// 编辑（只是填表单，不发请求，不变）
 const handleEdit = (record: Article) => {
   isEditing.value = true
-  editingOriginalId.value = record.id // 记住要修改谁
-  // 把表格里的数据填充到上面的表单里
-  Object.assign(formState, {
-    id: record.id,
-    title: record.title,
-    desc: record.desc,
-    categoryId: record.categoryId,
-    author: record.author
-  })
-  window.scrollTo({ top: 0, behavior: 'smooth' }) // 自动滚回网页顶部填表
+  editingOriginalId.value = record.id
+  Object.assign(formState, record)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-// 点击表格里的“删除”按钮
+// 删除
 const handleDelete = (record: any) => {
   Modal.confirm({
-    title: `确定要彻底删除《${record.title}》吗？`,
-    content: '删除后无法恢复，且需要手动删除本地的 .md 文件！',
+    title: `确定要删除《${record.title}》吗？`,
     okText: '确认删除',
     okType: 'danger',
     cancelText: '取消',
     async onOk() {
       try {
-        await axios.delete(`http://localhost:3000/api/articles/${record.id}`)
+        await axios.delete(
+          `http://localhost:3000/api/articles/${record.id}`,
+          authHeader() // 👈
+        )
         message.success('🗑️ 删除成功！')
-        fetchArticles() // 刷新表格
+        fetchArticles()
       } catch (error) {
-        message.error('删除失败')
+        handleError(error, '删除失败')
       }
     }
   })
 }
 
-// 取消编辑，清空表单
 const resetForm = () => {
   isEditing.value = false
   editingOriginalId.value = ''

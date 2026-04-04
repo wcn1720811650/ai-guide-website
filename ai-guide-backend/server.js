@@ -3,6 +3,7 @@ require('dotenv').config(); // 引入环境变量（读取 .env 文件）
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = 3000;
@@ -33,6 +34,18 @@ const articleSchema = new mongoose.Schema({
 
 // 生成操作文章的 Model（这就相当于操作数据库的遥控器）
 const Article = mongoose.model('Article', articleSchema);
+
+// 一个验证 token 的中间件
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) return res.status(401).json({ message: '未授权' })
+  try {
+    jwt.verify(token, process.env.JWT_SECRET)
+    next()
+  } catch {
+    res.status(401).json({ message: 'Token 无效或已过期' })
+  }
+}
 
 // ==========================================
 // 3. 编写真实的 API 接口
@@ -106,7 +119,7 @@ app.get('/api/articles/:id', async (req, res) => {
 // 🌟 新增：站长专属发布接口 (POST 请求)
 // 接收前端表单传来的新文章数据，存入 MongoDB
 // ==========================================
-app.post('/api/articles', async (req, res) => {
+app.post('/api/articles', authMiddleware ,async (req, res) => {
   try {
     // req.body 就是前端表单填写的那些数据
     const newArticleData = req.body;
@@ -135,7 +148,7 @@ app.post('/api/articles', async (req, res) => {
 // ==========================================
 // ✏️ 修改文章接口 (PUT)
 // ==========================================
-app.put('/api/articles/:id', async (req, res) => {
+app.put('/api/articles/:id', authMiddleware, async (req, res) => {
   try {
     const articleId = req.params.id;
     const updateData = req.body;
@@ -157,7 +170,7 @@ app.put('/api/articles/:id', async (req, res) => {
 // ==========================================
 // 🗑️ 删除文章接口 (DELETE)
 // ==========================================
-app.delete('/api/articles/:id', async (req, res) => {
+app.delete('/api/articles/:id', authMiddleware, async (req, res) => {
   try {
     const articleId = req.params.id;
     // 直接让数据库抹除这条记录
@@ -167,6 +180,17 @@ app.delete('/api/articles/:id', async (req, res) => {
     res.status(500).json({ message: '删除失败' });
   }
 });
+
+// 新增admin登录接口
+app.post('/api/login', (req, res) => {
+  const { password } = req.body
+  if (password === process.env.ADMIN_PASSWORD) { // 密码存在 .env 里，不进代码
+    const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '2h' })
+    res.json({ token })
+  } else {
+    res.status(401).json({ message: '密码错误' })
+  }
+})
 
 // // ==========================================
 // // 4. 🌟 魔法接口：一键初始化假数据
