@@ -26,7 +26,7 @@ onMounted(async () => {
     const response = await axios.get(`http://localhost:3000/api/articles?category=${categoryId}`)
     
     // 把后端给的数据（response.data）存进变量里
-    filteredArticles.value = response.data
+    filteredArticles.value = response.data.articles
     console.log(filteredArticles.value)
   } catch (error) {
     console.error('哎呀，后端服务器是不是没开？', error)
