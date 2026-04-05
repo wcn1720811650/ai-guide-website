@@ -4,13 +4,13 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-
+const authRoutes = require('./routes/auth');
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use(express.json()); // 允许后端接收 JSON 格式的数据
-
+app.use('/api/user', authRoutes);
 // ==========================================
 // 1. 连接云端数据库
 // ==========================================
