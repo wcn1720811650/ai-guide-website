@@ -26,6 +26,7 @@ const articleSchema = new mongoose.Schema({
   id: String,        // 文章英文名 (如 hello-ai)
   title: String,     // 标题
   desc: String,      // 简介
+  content: String,   // 内容
   categoryId: String,// 分类
   date: String,      // 日期
   author: String,    // 作者
@@ -155,7 +156,7 @@ app.put('/api/articles/:id', authMiddleware, async (req, res) => {
     
     // 找到对应 id 的文章，并用新数据覆盖它
     // { new: true } 的意思是返回修改后的最新数据
-    const updatedArticle = await Article.findOneAndUpdate({ id: articleId }, updateData, { new: true });
+    const updatedArticle = await Article.findOneAndUpdate({ id: articleId }, updateData, { returnDocument: 'after' });
     
     if (updatedArticle) {
       res.json({ message: '✅ 修改成功！', data: updatedArticle });

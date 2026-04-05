@@ -52,7 +52,7 @@ const columns = [
   { title: '操作', key: 'action' }
 ]
 const formState = reactive({
-  id: '', title: '', desc: '', categoryId: 'basic', author: '站长'
+  id: '', title: '', desc: '', content: '', categoryId: 'basic', author: '站长'
 })
 
 // 读取（不需要 token，是公开接口）
@@ -125,7 +125,7 @@ const handleDelete = (record: any) => {
 const resetForm = () => {
   isEditing.value = false
   editingOriginalId.value = ''
-  Object.assign(formState, { id: '', title: '', desc: '', categoryId: 'basic', author: '站长' })
+  Object.assign(formState, { id: '', title: '', desc: '',content:'', categoryId: 'basic', author: '站长' })
 }
 </script>
 
@@ -166,6 +166,15 @@ const resetForm = () => {
           
           <a-form-item label="文章列表简介" name="desc" :rules="[{ required: true, message: '必填' }]">
             <a-textarea v-model:value="formState.desc" :rows="2" />
+          </a-form-item>
+
+          <a-form-item label="文章正文（Markdown 格式）" name="content">
+            <a-textarea 
+              v-model:value="formState.content" 
+              :rows="16" 
+              placeholder="在这里用 Markdown 写文章正文，例如：## 标题&#10;&#10;正文内容..."
+              style="font-family: monospace; font-size: 14px;"
+            />
           </a-form-item>
 
           <a-form-item style="margin-bottom: 0;">
