@@ -6,6 +6,7 @@ import ArticleList from '@/views/ArticleList.vue'
 import Admin from '@/views/Admin.vue'
 import NotFound from '@/views/NotFound.vue'
 import Register from '@/views/Register.vue'
+import Login from '@/views/Login.vue'
 // 🌟 重点在这里：声明 routes 是一个 RouteRecordRaw 类型的数组
 const routes: Array<RouteRecordRaw> = [
   {
@@ -37,6 +38,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/register',
     name: 'Register',
     component: Register
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login
   }
 ]
 

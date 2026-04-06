@@ -1,18 +1,66 @@
+<script setup lang="ts">
+  import { reactive, ref } from 'vue'
+  import { useRouter } from 'vue-router'
+  import axios from 'axios'
+  import { UserOutlined } from '@ant-design/icons-vue'
+  import type { Rule } from 'ant-design-vue/es/form'
+
+  const router = useRouter()
+
+  const formState = reactive({
+    username: '',
+    password: '',
+    confirmPassword: ''
+  })
+
+  const errorMessage = ref('')
+  const successMessage = ref('')
+  const isLoading = ref(false)
+
+  const validateConfirmPassword = async (_rule: Rule, value: string) => {
+    if (!value) return Promise.reject('请确认密码')
+    if (value !== formState.password) return Promise.reject('两次密码不一致')
+    return Promise.resolve()
+  }
+
+  const handleRegister = async (values: any) => {
+    errorMessage.value = ''
+    successMessage.value = ''
+    isLoading.value = true
+
+    try {
+      const res = await axios.post('http://localhost:3000/api/user/register', {
+        username: values.username,
+        password: values.password
+      })
+
+      successMessage.value = res.data.message || '注册成功'
+
+      setTimeout(() => {
+        router.push('/login')
+      }, 1200)
+    } catch (err: any) {
+      errorMessage.value = err?.response?.data?.message || '请求失败'
+    } finally {
+      isLoading.value = false
+    }
+  }
+</script>
+
 <template>
-    <div class="min-h-screen flex items-center justify-center bg-[#0b1220] px-4">
-      <div class="w-full max-w-md">
+    <div>
+      <div>
         <a-card
-          class="rounded-2xl border border-[#1f2a44] bg-[#0f172a]/80 backdrop-blur-md shadow-lg"
           :body-style="{ padding: '32px' }"
           style="border-color:#10b981"
         >
           <!-- Header -->
-          <div class="text-center mb-8">
-            <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-[#10b981]/10 flex items-center justify-center">
-              <UserOutlined class="text-[#10b981] text-xl" />
+          <div>
+            <div>
+              <UserOutlined />
             </div>
-            <h2 class="text-xl font-semibold text-slate-100">创建账户</h2>
-            <p class="text-slate-400 text-sm mt-1">连接你的 AI 世界</p>
+            <h2 >创建账户</h2>
+            <p>连接你的 AI 世界</p>
           </div>
   
           <!-- Form -->
@@ -96,11 +144,10 @@
             </a-form-item>
   
             <!-- Footer -->
-            <div class="text-center text-sm text-slate-400 mt-6">
+            <div>
               已有账号？
               <router-link
                 to="/login"
-                class="text-[#10b981] hover:underline"
                 style="color: #10b981"
               >
                 去登录
@@ -110,68 +157,33 @@
         </a-card>
       </div>
     </div>
-  </template>
-  
-  <script setup lang="ts">
-  import { reactive, ref } from 'vue'
-  import { useRouter } from 'vue-router'
-  import axios from 'axios'
-  import { UserOutlined } from '@ant-design/icons-vue'
-  import type { Rule } from 'ant-design-vue/es/form'
-  
-  const router = useRouter()
-  
-  const formState = reactive({
-    username: '',
-    password: '',
-    confirmPassword: ''
-  })
-  
-  const errorMessage = ref('')
-  const successMessage = ref('')
-  const isLoading = ref(false)
-  
-  const validateConfirmPassword = async (_rule: Rule, value: string) => {
-    if (!value) return Promise.reject('请确认密码')
-    if (value !== formState.password) return Promise.reject('两次密码不一致')
-    return Promise.resolve()
-  }
-  
-  const handleRegister = async (values: any) => {
-    errorMessage.value = ''
-    successMessage.value = ''
-    isLoading.value = true
-  
-    try {
-      const res = await axios.post('http://localhost:3000/api/user/register', {
-        username: values.username,
-        password: values.password
-      })
-  
-      successMessage.value = res.data.message || '注册成功'
-  
-      setTimeout(() => {
-        router.push('/login')
-      }, 1200)
-    } catch (err: any) {
-      errorMessage.value = err?.response?.data?.message || '请求失败'
-    } finally {
-      isLoading.value = false
-    }
-  }
-  </script>
-  
-  <style scoped>
-    :deep(.ant-input),
-    :deep(.ant-input-affix-wrapper) {
-    background-color: #ffffff !important;
-    border-color: #e5e7eb !important;
-    color: #0f172a !important;
-    }
+</template>
 
-    :deep(.ant-input:focus),
-    :deep(.ant-input-affix-wrapper-focused) {
+
+<style scoped>
+  :deep(.ant-input),
+  :deep(.ant-input-affix-wrapper) {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #0f172a !important;
+  }
+
+  :deep(.ant-input:focus),
+  :deep(.ant-input-affix-wrapper-focused) {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15) !important;
+  }
+  .rounded-lg {
+    background-color: #10b981 !important;
     border-color: #10b981 !important;
-    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15) !important;
-    }
-  </style>
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+  }
+  
+  .rounded-lg:hover,
+  .rounded-lg:focus {
+    background-color: #34d399 !important;
+    border-color: #34d399 !important;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+    transform: translateY(-1px);
+  }
+</style>
