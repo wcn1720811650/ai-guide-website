@@ -9,4 +9,8 @@ const authController = require('../controllers/authController');
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 
+router.get('/wechat/qrcode', authController.generateWechatQR);
+router.get('/wechat/status', authController.checkWechatStatus);
+router.post('/wechat/simulate-scan', authController.simulatePhoneScan);
+
 module.exports = router;
