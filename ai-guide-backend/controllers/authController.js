@@ -55,7 +55,10 @@ exports.login = async (req, res) => {
 
     // 3. 密码正确，签发 JWT 通行证 (Token)
     const token = jwt.sign(
-      { userId: user._id, role: 'user' }, 
+      { userId: user._id,
+        username: user.username, 
+        role: 'user' 
+      }, 
       process.env.JWT_SECRET, 
       { expiresIn: '7d' }
     );

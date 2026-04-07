@@ -117,10 +117,12 @@ const categories = [
             开始第一课
           </a-button>
         </router-link>
-        <a-button size="large" style="border-radius: 8px; height: 50px; padding: 0 30px; font-size: 16px;">
-          <template #icon><Coffee :size="18" style="margin-right: 6px; vertical-align: -4px;"/></template>
-          先随便逛逛
-        </a-button>
+        <router-link to="/community">
+          <a-button size="large" style="border-radius: 8px; height: 50px; padding: 0 30px; font-size: 16px;">
+            <template #icon><Coffee :size="18" style="margin-right: 6px; vertical-align: -4px;"/></template>
+            先随便逛逛
+          </a-button>
+        </router-link>
       </a-space>
     </div>
 
