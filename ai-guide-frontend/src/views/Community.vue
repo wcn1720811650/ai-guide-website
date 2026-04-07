@@ -15,7 +15,19 @@
         <div v-if="posts.length === 0" class="empty-state">
           暂无内容，来做第一个分享灵感的人吧！
         </div>
-        
+
+        <div v-if="selectedTag" class="filter-banner">
+          <span>正在查看领域: <strong class="filter-highlight"># {{ selectedTag }}</strong></span>
+          <a-button type="link" @click="clearFilter" size="small" class="clear-btn">
+            清除过滤 ✖
+          </a-button>
+        </div>
+
+        <div v-if="posts.length === 0" class="empty-state">
+          <span v-if="selectedTag">没有找到关于 "{{ selectedTag }}" 的内容哦~</span>
+          <span v-else>暂无内容，来做第一个分享灵感的人吧！</span>
+        </div>
+
         <div class="post-list">
           <a-card 
             v-for="post in posts" 
@@ -24,12 +36,24 @@
             hoverable
             @click="router.push(`/post/${post._id}`)"
           >
-            <h3 class="post-title">{{ post.title }}</h3>
-            <p class="post-preview">{{ post.content.substring(0, 100) }}...</p>
+            <div class="card-header">
+              <h3 class="post-title">{{ post.title }}</h3>
+              <span class="view-count"><EyeOutlined /> {{ post.views || 0 }}</span>
+            </div>
+
+            <p class="post-preview">{{ post.content.substring(0, 80) }}...</p>
             
-            <div class="post-meta">
-              <span class="author-tag">发布者: {{ post.authorName }}</span>
-              <span class="time-tag">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
+            <div class="card-footer">
+              <div class="post-meta">
+                <span class="author-tag">发布者: {{ post.authorName }}</span>
+                <span class="time-tag">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
+              </div>
+
+              <div class="post-tags" v-if="post.tags && post.tags.length">
+                <a-tag v-for="tag in post.tags" :key="tag" class="custom-tag" @click.stop="handleTagClick(tag)">
+                  {{ tag }}
+                </a-tag>
+              </div>
             </div>
           </a-card>
         </div>
@@ -51,6 +75,18 @@
             size="large"
             class="form-item"
           />
+          <a-select
+            v-model:value="newPost.tags"
+            mode="tags"
+            placeholder="选择或输入相关领域 (如: ChatGPT, 提示词, 绘图)"
+            class="form-item"
+            style="width: 100%"
+          >
+            <a-select-option value="ChatGPT">ChatGPT</a-select-option>
+            <a-select-option value="提示词">提示词</a-select-option>
+            <a-select-option value="Midjourney">Midjourney</a-select-option>
+          </a-select>
+
           <a-textarea 
             v-model:value="newPost.content" 
             placeholder="支持 Markdown 语法。在这里写下你的干货内容..." 
@@ -67,28 +103,45 @@
   import { ref, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { message } from 'ant-design-vue'
+  import { ArrowLeftOutlined, EyeOutlined } from '@ant-design/icons-vue'
   import axios from 'axios'
   
   const router = useRouter()
   const posts = ref<any[]>([])
   const loading = ref(true)
-  
   // 弹窗与表单状态
   const isModalVisible = ref(false)
   const submitting = ref(false)
-  const newPost = ref({ title: '', content: '' })
+  const newPost = ref({ title: '', content: '', tags: [] }) 
+  const selectedTag = ref('')
   
   // 1. 获取帖子列表
   const fetchPosts = async () => {
-    loading.value = true
-    try {
-      const res = await axios.get('http://localhost:3000/api/posts')
+  loading.value = true
+  try {
+      // 如果选中了标签，就拼接到 URL 后面
+      const url = selectedTag.value 
+        ? `http://localhost:3000/api/posts?tag=${encodeURIComponent(selectedTag.value)}`
+        : 'http://localhost:3000/api/posts'
+        
+      const res = await axios.get(url)
       posts.value = res.data
     } catch (error) {
       message.error('获取帖子失败')
     } finally {
       loading.value = false
     }
+  }
+
+  const handleTagClick = (tag: string) => {
+    if (selectedTag.value === tag) return // 如果点的已经是当前标签，无视
+    selectedTag.value = tag
+    fetchPosts()
+  }
+
+  const clearFilter = () => {
+    selectedTag.value = ''
+    fetchPosts()
   }
   
   // 2. 点击发布按钮时的拦截逻辑
@@ -112,7 +165,7 @@
     submitting.value = true
     try {
       const token = localStorage.getItem('token')
-      // 🌟 发送请求时，务必在 Header 中带上身份令牌 (Token) 供中间件检查！
+      // 务必在 Header 中带上身份令牌 (Token) 供中间件检查！
       await axios.post(
         'http://localhost:3000/api/posts', 
         newPost.value,
@@ -208,9 +261,16 @@
   
   .post-meta {
     display: flex;
+    align-items: center;
     gap: 16px;
     font-size: 13px;
   }
+  .card-footer {
+    display: flex;
+    justify-content: space-between; 
+    align-items: flex-end; 
+    margin-top: 16px;
+}
   
   .author-tag {
     color: #10b981;
@@ -234,5 +294,75 @@
     background-color: #f9fafb;
     border-radius: 12px;
     border: 1px dashed #e5e7eb;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+
+  .view-count {
+    font-size: 13px;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end; 
+    gap: 6px;
+    max-width: 50%;
+  }
+
+  .custom-tag {
+    margin-right: 0; 
+    border-radius: 4px;
+    font-size: 12px;
+    border: none;
+    background-color: #f0fdf4;
+    color: #10b981;
+  }
+  /* 🌟 新增：过滤提示条样式 */
+  .filter-banner {
+    background-color: #ecfdf5; /* 浅薄荷绿背景 */
+    border: 1px dashed #10b981;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #065f46;
+    font-size: 14px;
+  }
+
+  .filter-highlight {
+    font-size: 16px;
+    color: #10b981;
+  }
+
+  .clear-btn {
+    color: #64748b;
+  }
+
+  .clear-btn:hover {
+    color: #ef4444; /* 悬浮时变红，表示清除 */
+  }
+
+  /* 🌟 修改标签的交互效果 */
+  .clickable-tag {
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .clickable-tag:hover {
+    background-color: #10b981;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
   }
   </style>

@@ -4,8 +4,14 @@ const Post = require('../models/Post');
 // 🌟 获取帖子列表 (所有人可见)
 exports.getPosts = async (req, res) => {
   try {
+    const { tag } = req.query;
+    let query = {};
+    if (tag) {
+      query.tags = tag; 
+    }
+    
     // 按时间倒序，最新的帖子在最前面
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const posts = await Post.find(query).sort({ createdAt: -1 });
     res.json(posts);
   } catch (error) {
     res.status(500).json({ message: '获取帖子列表失败' });
@@ -15,12 +21,13 @@ exports.getPosts = async (req, res) => {
 // 🌟 发布新帖子 (仅登录用户)
 exports.createPost = async (req, res) => {
   try {
-    const { title, content } = req.body;
+    const { title, content, tags } = req.body;
     
     // 这里的 req.user 是通过你之前写的 authMiddleware (保安) 挂载上来的！
     const newPost = new Post({
       title,
       content,
+      tags: tags || [],
       author: req.user.userId, // JWT 解密出来的用户 ID
       authorName: req.user.username // JWT 解密出来的用户名
     });
