@@ -60,3 +60,31 @@ exports.getPostById = async (req, res) => {
       res.status(500).json({ message: '服务器开小差了，获取详情失败' });
     }
   };
+
+  //点赞取消点赞
+  exports.toggleLike = async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const userId = req.user.userId; // 从 JWT 保安那里拿到的当前用户 ID
+
+      const post = await Post.findById(postId);
+      if (!post) return res.status(404).json({ message: '帖子找不到了' });
+
+      // 检查这个用户是否已经在点赞名单里
+      const index = post.likes.indexOf(userId);
+
+      if (index === -1) {
+        // 没点过赞：加进去
+        post.likes.push(userId);
+        await post.save();
+        res.json({ message: '点赞成功', liked: true, count: post.likes.length });
+      } else {
+        // 点过赞了：删掉 (取消点赞)
+        post.likes.splice(index, 1);
+        await post.save();
+        res.json({ message: '已取消点赞', liked: false, count: post.likes.length });
+      }
+    } catch (error) {
+      res.status(500).json({ message: '点赞操作失败' });
+    }
+  };
