@@ -11,4 +11,5 @@ router.get('/:id', postController.getPostById);
 // 必须经过 authMiddleware 检查（必须登录）才能发帖
 router.post('/', authMiddleware, postController.createPost);
 router.post('/:id/like', authMiddleware, postController.toggleLike);
+router.post('/:id/comments', authMiddleware, postController.addComment);
 module.exports = router;

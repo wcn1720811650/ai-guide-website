@@ -88,3 +88,39 @@ exports.getPostById = async (req, res) => {
       res.status(500).json({ message: '点赞操作失败' });
     }
   };
+  
+  // 发布评论
+exports.addComment = async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { content } = req.body;
+    
+    // 从鉴权中间件解析出的当前登录用户信息
+    const userId = req.user.userId;     
+    const username = req.user.username; 
+
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ message: '评论内容不能为空' });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: '帖子不存在' });
+
+    // 构建新评论并压入数组
+    const newComment = {
+      content,
+      author: userId,
+      authorName: username,
+      createdAt: new Date()
+    };
+
+    post.comments.push(newComment);
+    await post.save();
+
+    // 返回最新的评论列表给前端刷新
+    res.status(201).json({ message: '评论成功', comments: post.comments });
+  } catch (error) {
+    console.error('评论报错:', error);
+    res.status(500).json({ message: '发布评论失败' });
+  }
+};

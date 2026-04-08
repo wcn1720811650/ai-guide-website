@@ -51,6 +51,52 @@
           </div>
         </div>
 
+        <div class="comments-section">
+          <h3 class="comments-title">
+            评论交流 ({{ post.comments?.length || 0 }})
+          </h3>
+
+          <div class="comment-input-box">
+            <a-textarea 
+              v-model:value="newCommentContent" 
+              placeholder="分享你的见解，支持友善交流..." 
+              :rows="3" 
+              class="comment-textarea"
+            />
+            <div class="comment-submit-row">
+              <a-button 
+                type="primary" 
+                class="submit-comment-btn" 
+                :loading="submittingComment"
+                @click="submitComment"
+              >
+                发表评论
+              </a-button>
+            </div>
+          </div>
+
+          <div class="comments-list">
+            <div v-for="comment in post.comments" :key="comment._id" class="comment-item">
+              <div class="comment-avatar">
+                <a-avatar class="bg-[#10b981] text-white">{{ comment.authorName.charAt(0).toUpperCase() }}</a-avatar>
+              </div>
+              <div class="comment-main">
+                <div class="comment-info">
+                  <span class="comment-user">{{ comment.authorName }}</span>
+                  <span v-if="comment.author === post.author" class="author-badge">作者</span>
+                  
+                  <span class="comment-time">{{ new Date(comment.createdAt).toLocaleString() }}</span>
+                </div>
+                <div class="comment-text">{{ comment.content }}</div>
+              </div>
+            </div>
+
+            <div v-if="!post.comments || post.comments.length === 0" class="empty-comments">
+              还没有人发言，快来抢占沙发吧！
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <a-empty v-else-if="!loading" description="哎呀，这篇帖子似乎飘向了宇宙深处..." class="mt-20" />
@@ -82,6 +128,9 @@ const loading = ref(true)
 const isLiked = ref(false)
 const likeCount = ref(0)
 
+const newCommentContent = ref('')
+const submittingComment = ref(false)
+
 // ==========================================
 // 🚀 配置超强 Markdown 解析引擎
 // ==========================================
@@ -95,6 +144,38 @@ const marked = new Marked(
     }
   })
 )
+
+// 🌟 提交评论方法
+const submitComment = async () => {
+  if (!newCommentContent.value.trim()) {
+    message.warning('写点什么再发布吧~')
+    return
+  }
+
+  const token = localStorage.getItem('token')
+  if (!token) {
+    message.warning('请先登录后再参与交流')
+    router.push('/login')
+    return
+  }
+
+  submittingComment.value = true
+  try {
+    const res = await axios.post(
+      `http://localhost:3000/api/posts/${post.value._id}/comments`,
+      { content: newCommentContent.value },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    
+    post.value.comments = res.data.comments
+    newCommentContent.value = '' 
+    message.success('评论发布成功！')
+  } catch (error) {
+    message.error('评论发布失败，请重试')
+  } finally {
+    submittingComment.value = false
+  }
+}
 
 // 当获取到文章数据时，实时将其转译为带有高亮标签的 HTML 字符串
 const parsedContent = computed(() => {
@@ -206,10 +287,18 @@ onMounted(() => {
 .post-meta {
   display: flex;
   justify-content: space-between;
-  margin-top: 16px;
   align-items: center;
   color: #6b7280;
   font-size: 14px;
+}
+.detail-tags {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .meta-left { display: flex; align-items: center; gap: 8px; }
 .author-name { font-weight: 600; color: #374151; }
@@ -354,5 +443,124 @@ onMounted(() => {
   max-width: 100%;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.comments-section {
+  margin-top: 50px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 40px;
+}
+
+.comments-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 24px;
+}
+
+.comment-input-box {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 32px;
+  transition: border-color 0.3s;
+}
+
+.comment-input-box:focus-within {
+  border-color: #10b981;
+}
+
+.comment-textarea {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  resize: none;
+  font-size: 15px;
+  padding: 0;
+  margin-bottom: 12px;
+}
+
+.comment-submit-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-comment-btn {
+  background-color: #10b981 !important;
+  border-color: #10b981 !important;
+  border-radius: 8px;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.comment-item {
+  display: flex;
+  gap: 16px;
+}
+
+.comment-avatar {
+  flex-shrink: 0;
+}
+
+.comment-main {
+  flex-grow: 1;
+  background-color: #f8fafc;
+  padding: 16px;
+  border-radius: 0 12px 12px 12px;
+  border: 1px solid #f1f5f9;
+}
+
+.comment-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.comment-user {
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+}
+
+/* 🌟 作者专属小标 */
+.author-badge {
+  background-color: #ecfdf5;
+  color: #10b981;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #a7f3d0;
+  line-height: 1;
+}
+
+.comment-time {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-left: auto;
+}
+
+.comment-text {
+  font-size: 15px;
+  color: #475569;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.empty-comments {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px 0;
+  font-size: 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px dashed #e2e8f0;
 }
 </style>
