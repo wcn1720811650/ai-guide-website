@@ -9,12 +9,6 @@
       <div v-if="post" class="post-content-wrapper">
         <div class="post-header">
           <h1 class="post-title">{{ post.title }}</h1>
-          
-          <div class="detail-tags" v-if="post.tags && post.tags.length">
-            <a-tag v-for="tag in post.tags" :key="tag" color="green" class="mb-4">
-              # {{ tag }}
-            </a-tag>
-          </div>
 
           <div class="post-meta">
             <div class="meta-left">
@@ -24,6 +18,12 @@
               <span class="author-name">{{ post.authorName }}</span>
               <span class="meta-divider">•</span>
               <span class="time-text">{{ new Date(post.createdAt).toLocaleString() }}</span>
+            </div>
+
+            <div class="detail-tags" v-if="post.tags && post.tags.length">
+              <a-tag v-for="tag in post.tags" :key="tag" color="green" class="mb-4">
+                # {{ tag }}
+              </a-tag>
             </div>
             
             <div class="meta-right">
@@ -84,10 +84,34 @@
                 <div class="comment-info">
                   <span class="comment-user">{{ comment.authorName }}</span>
                   <span v-if="comment.author === post.author" class="author-badge">作者</span>
-                  
+                  <span v-if="comment.author === currentUserId" class="me-badge">我</span>
                   <span class="comment-time">{{ new Date(comment.createdAt).toLocaleString() }}</span>
                 </div>
+
                 <div class="comment-text">{{ comment.content }}</div>
+                <div class="comment-footer-actions">
+                  <span 
+                    class="comment-action-item" 
+                    :class="{ 'comment-liked': isCommentLiked(comment) }"
+                    @click="handleToggleCommentLike(comment._id)"
+                  >
+                    <HeartFilled v-if="isCommentLiked(comment)" />
+                    <HeartOutlined v-else />
+                    {{ comment.likes?.length || 0 }}
+                  </span>
+
+                  <a-popconfirm
+                    v-if="comment.author === currentUserId"
+                    title="确定要删除这条评论吗？"
+                    @confirm="handleDeleteComment(comment._id)"
+                    ok-text="确定"
+                    cancel-text="取消"
+                  >
+                    <span class="comment-action-item delete-action">
+                      <DeleteOutlined /> 删除
+                    </span>
+                  </a-popconfirm>
+                </div>
               </div>
             </div>
 
@@ -110,7 +134,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { message } from 'ant-design-vue'
-import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue'
+import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled, DeleteOutlined } from '@ant-design/icons-vue'
 
 // 🌟 引入 Markdown 和 代码高亮核心库
 import { Marked } from 'marked'
@@ -174,6 +198,54 @@ const submitComment = async () => {
     message.error('评论发布失败，请重试')
   } finally {
     submittingComment.value = false
+  }
+}
+
+// 获取当前登录用户 ID (用于判断是否显示删除按钮)
+const currentUserId = computed(() => {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.userId || payload.id
+  } catch (e) { return null }
+})
+
+// 判断评论是否被当前用户点赞
+const isCommentLiked = (comment: any) => {
+  const userId = currentUserId.value
+  return userId && comment.likes?.includes(userId)
+}
+
+// 处理评论点赞
+const handleToggleCommentLike = async (commentId: string) => {
+  const token = localStorage.getItem('token')
+  if (!token) return message.warning('请登录后再点赞')
+
+  try {
+    const res = await axios.post(
+      `http://localhost:3000/api/posts/${post.value._id}/comments/${commentId}/like`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    post.value.comments = res.data.comments // 局部刷新评论数据
+  } catch (error) {
+    message.error('点赞失败')
+  }
+}
+
+// 处理删除评论
+const handleDeleteComment = async (commentId: string) => {
+  const token = localStorage.getItem('token')
+  try {
+    const res = await axios.delete(
+      `http://localhost:3000/api/posts/${post.value._id}/comments/${commentId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    post.value.comments = res.data.comments
+    message.success('评论已删除')
+  } catch (error) {
+    message.error('删除失败')
   }
 }
 
@@ -291,13 +363,10 @@ onMounted(() => {
   color: #6b7280;
   font-size: 14px;
 }
+
 .detail-tags {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  margin-right: -200px;
   gap: 8px;
 }
 .meta-left { display: flex; align-items: center; gap: 8px; }
@@ -562,5 +631,54 @@ onMounted(() => {
   background: #f8fafc;
   border-radius: 12px;
   border: 1px dashed #e2e8f0;
+}
+
+.comment-footer-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.comment-action-item {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.comment-action-item:hover {
+  color: #10b981;
+}
+
+.comment-liked {
+  color: #f43f5e !important;
+}
+
+.delete-action:hover {
+  color: #ef4444 !important;
+}
+
+.comment-main {
+  /* 调整下内边距，给操作栏留空间 */
+  padding: 12px 16px 10px 16px;
+}
+
+.me-badge {
+  background-color: #eff6ff;
+  color: #3b82f6;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #bfdbfe;
+  line-height: 1;
+}
+
+/* 确保两个标签同时出现时有间距 */
+.author-badge + .me-badge {
+  margin-left: 4px;
 }
 </style>

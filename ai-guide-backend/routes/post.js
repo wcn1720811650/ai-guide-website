@@ -12,4 +12,9 @@ router.get('/:id', postController.getPostById);
 router.post('/', authMiddleware, postController.createPost);
 router.post('/:id/like', authMiddleware, postController.toggleLike);
 router.post('/:id/comments', authMiddleware, postController.addComment);
+
+// 删除评论路由
+router.delete('/:id/comments/:commentId', authMiddleware, postController.deleteComment);
+// 评论点赞路由
+router.post('/:id/comments/:commentId/like', authMiddleware, postController.toggleCommentLike);
 module.exports = router;

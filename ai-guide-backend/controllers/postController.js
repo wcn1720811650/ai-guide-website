@@ -90,37 +90,89 @@ exports.getPostById = async (req, res) => {
   };
   
   // 发布评论
-exports.addComment = async (req, res) => {
-  try {
-    const postId = req.params.id;
-    const { content } = req.body;
-    
-    // 从鉴权中间件解析出的当前登录用户信息
-    const userId = req.user.userId;     
-    const username = req.user.username; 
+  exports.addComment = async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const { content } = req.body;
+      
+      // 从鉴权中间件解析出的当前登录用户信息
+      const userId = req.user.userId;     
+      const username = req.user.username; 
 
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ message: '评论内容不能为空' });
+      if (!content || content.trim() === '') {
+        return res.status(400).json({ message: '评论内容不能为空' });
+      }
+
+      const post = await Post.findById(postId);
+      if (!post) return res.status(404).json({ message: '帖子不存在' });
+
+      // 构建新评论并压入数组
+      const newComment = {
+        content,
+        author: userId,
+        authorName: username,
+        createdAt: new Date()
+      };
+
+      post.comments.push(newComment);
+      await post.save();
+
+      // 返回最新的评论列表给前端刷新
+      res.status(201).json({ message: '评论成功', comments: post.comments });
+    } catch (error) {
+      console.error('评论报错:', error);
+      res.status(500).json({ message: '发布评论失败' });
     }
+  };
 
-    const post = await Post.findById(postId);
-    if (!post) return res.status(404).json({ message: '帖子不存在' });
+    // 删除评论
+  exports.deleteComment = async (req, res) => {
+    try {
+      const { id, commentId } = req.params;
+      const userId = req.user.userId;
 
-    // 构建新评论并压入数组
-    const newComment = {
-      content,
-      author: userId,
-      authorName: username,
-      createdAt: new Date()
-    };
+      const post = await Post.findById(id);
+      if (!post) return res.status(404).json({ message: '帖子不存在' });
 
-    post.comments.push(newComment);
-    await post.save();
+      // 找到该评论
+      const comment = post.comments.id(commentId);
+      if (!comment) return res.status(404).json({ message: '评论已不存在' });
 
-    // 返回最新的评论列表给前端刷新
-    res.status(201).json({ message: '评论成功', comments: post.comments });
-  } catch (error) {
-    console.error('评论报错:', error);
-    res.status(500).json({ message: '发布评论失败' });
-  }
-};
+      // 鉴权：只有评论作者可以删除
+      if (comment.author.toString() !== userId) {
+        return res.status(403).json({ message: '无权删除他人评论' });
+      }
+
+      // 从数组中移除
+      post.comments.pull(commentId);
+      await post.save();
+
+      res.json({ message: '评论已删除', comments: post.comments });
+    } catch (error) {
+      res.status(500).json({ message: '删除评论失败' });
+    }
+  };
+
+  // 切换评论点赞
+  exports.toggleCommentLike = async (req, res) => {
+    try {
+      const { id, commentId } = req.params;
+      const userId = req.user.userId;
+
+      const post = await Post.findById(id);
+      const comment = post.comments.id(commentId);
+      if (!comment) return res.status(404).json({ message: '评论不存在' });
+
+      const index = comment.likes.indexOf(userId);
+      if (index === -1) {
+        comment.likes.push(userId); // 点赞
+      } else {
+        comment.likes.splice(index, 1); // 取消点赞
+      }
+
+      await post.save();
+      res.json({ comments: post.comments });
+    } catch (error) {
+      res.status(500).json({ message: '操作失败' });
+    }
+  };
