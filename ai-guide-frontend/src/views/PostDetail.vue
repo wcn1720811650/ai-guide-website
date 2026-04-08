@@ -1,144 +1,358 @@
 <template>
-    <div class="post-detail-container">
-      <a-spin :spinning="loading">
-        
-        <div class="back-nav" @click="router.push('/community')">
-          <ArrowLeftOutlined class="mr-2" /> 返回社区广场
-        </div>
-  
-        <div v-if="post" class="post-content-wrapper">
-          <div class="post-header">
-            <h1 class="post-title">{{ post.title }}</h1>
+  <div class="post-detail-container">
+    <a-spin :spinning="loading">
+      
+      <div class="back-nav" @click="router.push('/community')">
+        <ArrowLeftOutlined class="mr-2" /> 返回社区广场
+      </div>
+
+      <div v-if="post" class="post-content-wrapper">
+        <div class="post-header">
+          <h1 class="post-title">{{ post.title }}</h1>
+          
+          <div class="detail-tags" v-if="post.tags && post.tags.length">
+            <a-tag v-for="tag in post.tags" :key="tag" color="green" class="mb-4">
+              # {{ tag }}
+            </a-tag>
+          </div>
+
+          <div class="post-meta">
+            <div class="meta-left">
+              <a-avatar size="small" class="author-avatar bg-[#10b981]">
+                {{ post.authorName.charAt(0).toUpperCase() }}
+              </a-avatar>
+              <span class="author-name">{{ post.authorName }}</span>
+              <span class="meta-divider">•</span>
+              <span class="time-text">{{ new Date(post.createdAt).toLocaleString() }}</span>
+            </div>
             
-            <div class="post-meta">
-              <div class="meta-left">
-                <a-avatar size="small" class="author-avatar bg-[#10b981]">
-                  {{ post.authorName.charAt(0).toUpperCase() }}
-                </a-avatar>
-                <span class="author-name">{{ post.authorName }}</span>
-                <span class="meta-divider">•</span>
-                <span class="time-text">{{ new Date(post.createdAt).toLocaleString() }}</span>
-              </div>
-              
-              <div class="meta-right">
-                <EyeOutlined class="mr-1" /> {{ post.views }} 次阅读
-              </div>
+            <div class="meta-right">
+              <EyeOutlined class="mr-1" /> {{ post.views }} 次阅读
             </div>
           </div>
-  
-          <a-divider />
-  
-          <div class="post-body">
-            {{ post.content }}
+        </div>
+
+        <a-divider />
+
+        <div 
+          class="post-body markdown-body" 
+          v-html="parsedContent"
+        ></div>
+
+        <div class="post-actions">
+          <div 
+            class="action-pill" 
+            :class="{ 'is-liked': isLiked }"
+            @click="handleLike"
+          >
+            <HeartFilled v-if="isLiked" class="action-icon active-icon" />
+            <HeartOutlined v-else class="action-icon" />
+            <span class="action-count">{{ likeCount > 0 ? likeCount : '点赞' }}</span>
           </div>
         </div>
-  
-        <a-empty v-else-if="!loading" description="哎呀，这篇帖子似乎飘向了宇宙深处..." class="mt-20" />
-  
-      </a-spin>
-    </div>
-  </template>
-  
-  <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
-  import axios from 'axios'
-  import { message } from 'ant-design-vue'
-  import { ArrowLeftOutlined, EyeOutlined } from '@ant-design/icons-vue'
-  
-  const route = useRoute()
-  const router = useRouter()
-  
-  const post = ref<any>(null)
-  const loading = ref(true)
-  
-  // 根据 URL 里的 ID 去后端拉取这篇帖子的详细信息
-  const fetchPostDetail = async () => {
-    const postId = route.params.id
-    try {
-      const res = await axios.get(`http://localhost:3000/api/posts/${postId}`)
-      post.value = res.data
-    } catch (error) {
-      message.error('无法加载帖子详情')
-    } finally {
-      loading.value = false
-    }
-  }
-  
-  onMounted(() => {
-    fetchPostDetail()
-  })
-  </script>
-  
-  <style scoped>
 
-  .post-detail-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 32px 20px 80px 20px;
+      </div>
+
+      <a-empty v-else-if="!loading" description="哎呀，这篇帖子似乎飘向了宇宙深处..." class="mt-20" />
+
+    </a-spin>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
+import { message } from 'ant-design-vue'
+import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue'
+
+// 🌟 引入 Markdown 和 代码高亮核心库
+import { Marked } from 'marked'
+import { markedHighlight } from 'marked-highlight'
+import hljs from 'highlight.js'
+// 引入一款极其极客的暗黑代码高亮主题（你也可以换成 github-dark.css）
+import 'highlight.js/styles/atom-one-dark.css'
+
+const route = useRoute()
+const router = useRouter()
+
+const post = ref<any>(null)
+const loading = ref(true)
+
+const isLiked = ref(false)
+const likeCount = ref(0)
+
+// ==========================================
+// 🚀 配置超强 Markdown 解析引擎
+// ==========================================
+const marked = new Marked(
+  markedHighlight({
+    langPrefix: 'hljs language-',
+    highlight(code, lang) {
+      // 检查语言是否被 highlight.js 支持，不支持就降级为纯文本
+      const language = hljs.getLanguage(lang) ? lang : 'plaintext'
+      return hljs.highlight(code, { language }).value
+    }
+  })
+)
+
+// 当获取到文章数据时，实时将其转译为带有高亮标签的 HTML 字符串
+const parsedContent = computed(() => {
+  if (!post.value || !post.value.content) return ''
+  return marked.parse(post.value.content)
+})
+
+// ==========================================
+// 获取帖子详情逻辑
+// ==========================================
+const fetchPostDetail = async () => {
+  const postId = route.params.id
+  try {
+    const res = await axios.get(`http://localhost:3000/api/posts/${postId}`)
+    post.value = res.data
+    
+    // 初始化点赞状态
+    const token = localStorage.getItem('token')
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        const userId = payload.userId || payload.id
+        isLiked.value = post.value.likes?.includes(userId)
+      } catch (e) {}
+    }
+    likeCount.value = post.value.likes?.length || 0
+
+  } catch (error) {
+    message.error('无法加载帖子详情')
+  } finally {
+    loading.value = false
   }
-  
-  .back-nav {
-    display: inline-flex;
-    align-items: center;
-    color: #6b7280;
-    cursor: pointer;
-    font-size: 14px;
-    margin-bottom: 24px;
-    transition: color 0.3s;
+}
+
+// ==========================================
+// 详情页点赞逻辑
+// ==========================================
+const handleLike = async () => {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    message.warning('请先登录再为干货点赞哦')
+    router.push('/login')
+    return
   }
-  
-  .back-nav:hover {
-    color: #10b981;
+
+  isLiked.value = !isLiked.value
+  likeCount.value += isLiked.value ? 1 : -1
+
+  try {
+    const res = await axios.post(
+      `http://localhost:3000/api/posts/${post.value._id}/like`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    isLiked.value = res.data.liked
+    likeCount.value = res.data.count
+    if (res.data.liked) message.success('❤')
+  } catch (error) {
+    isLiked.value = !isLiked.value
+    likeCount.value += isLiked.value ? 1 : -1
+    message.error('操作失败')
   }
-  
-  .post-content-wrapper {
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 40px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  }
-  
-  .post-header {
-    margin-bottom: 24px;
-  }
-  
-  .post-title {
-    font-size: 32px;
-    font-weight: 800;
-    color: #111827;
-    line-height: 1.4;
-    margin-bottom: 16px;
-  }
-  
-  .post-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #6b7280;
-    font-size: 14px;
-  }
-  
-  .meta-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .author-name {
-    font-weight: 600;
-    color: #374151;
-  }
-  
-  .meta-divider {
-    color: #d1d5db;
-  }
-  
-  .post-body {
-    font-size: 16px;
-    line-height: 1.8;
-    color: #374151;
-    white-space: pre-wrap; 
-    word-wrap: break-word;
-  }
-  </style>
+}
+
+onMounted(() => {
+  fetchPostDetail()
+})
+</script>
+
+<style scoped>
+/* ==========================================
+   原生的布局样式 (保持原有高级感)
+========================================== */
+.post-detail-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px 20px 80px 20px;
+}
+
+.back-nav {
+  display: inline-flex;
+  align-items: center;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 24px;
+  transition: color 0.3s;
+}
+
+.back-nav:hover { color: #10b981; }
+
+.post-content-wrapper {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.post-header { margin-bottom: 24px; }
+
+.post-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+.post-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  align-items: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+.meta-left { display: flex; align-items: center; gap: 8px; }
+.author-name { font-weight: 600; color: #374151; }
+.meta-divider { color: #d1d5db; }
+
+.post-actions {
+  display: flex;
+  justify-content: flex-start; /* 左对齐，显得更克制。如果是居中可以改成 center */
+  margin-top: 40px;
+  padding-top: 24px;
+}
+
+.action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #64748b; /* 低调的灰色 */
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 20px; /* 圆角胶囊 */
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+/* 鼠标悬浮时的反馈 */
+.action-pill:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.action-icon {
+  font-size: 16px;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.action-pill:hover .action-icon {
+  transform: scale(1.15); /* 悬浮时图标微动 */
+}
+
+/* 🌟 点赞后的激活状态 */
+.action-pill.is-liked {
+  color: #f43f5e;
+  border-color: #fecdd3;
+  background-color: #fff1f2;
+}
+
+.action-pill.is-liked:hover {
+  background-color: #ffe4e6;
+  border-color: #fda4af;
+}
+
+.active-icon {
+  animation: detailHeartBeat 0.4s ease-in-out forwards;
+}
+
+/* 独立的心跳微动画 */
+@keyframes detailHeartBeat {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* ==========================================
+   🌟 Markdown 深度美化 CSS  (掘金同款)
+   因为 v-html 注入的标签不受 scoped 限制，必须用 :deep() 穿透！
+========================================== */
+.markdown-body {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #334155;
+  word-wrap: break-word;
+}
+
+/* 标题样式 */
+:deep(.markdown-body h1), 
+:deep(.markdown-body h2), 
+:deep(.markdown-body h3) {
+  color: #0f172a;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+:deep(.markdown-body h2) {
+  font-size: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+/* 段落与列表 */
+:deep(.markdown-body p) { margin-bottom: 1.2em; }
+:deep(.markdown-body ul), :deep(.markdown-body ol) {
+  padding-left: 1.5em;
+  margin-bottom: 1.2em;
+}
+:deep(.markdown-body li) { margin-bottom: 0.5em; }
+
+/* 🌟 引用块 (Blockquote) */
+:deep(.markdown-body blockquote) {
+  margin: 1em 0;
+  padding: 10px 20px;
+  color: #64748b;
+  background-color: #f8fafc;
+  border-left: 4px solid #10b981; /* 左侧薄荷绿指示条 */
+  border-radius: 0 8px 8px 0;
+}
+
+/* 🌟 行内代码块 */
+:deep(.markdown-body code:not([class*="language-"])) {
+  background-color: #f1f5f9;
+  color: #ec4899; /* 骚粉色高亮 */
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.9em;
+}
+
+/* 🌟 多行代码块 (Pre) 外框美化 */
+:deep(.markdown-body pre) {
+  background-color: #282c34 !important; /* 暗黑背景 */
+  padding: 16px;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 1.5em 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.markdown-body pre code) {
+  font-family: 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent !important;
+}
+
+/* 图片防溢出 */
+:deep(.markdown-body img) {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+</style>

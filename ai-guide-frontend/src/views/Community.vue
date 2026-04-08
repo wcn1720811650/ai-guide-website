@@ -128,7 +128,7 @@ const submitting = ref(false)
 const newPost = ref({ title: '', content: '', tags: [] }) 
 const selectedTag = ref('')
 
-// 🌟 获取当前登录用户ID
+// 获取当前登录用户ID
 const getCurrentUserId = () => {
   const token = localStorage.getItem('token')
   if (!token) return null
@@ -140,14 +140,14 @@ const getCurrentUserId = () => {
   }
 }
 
-// 🌟 判断当前帖子是否被点赞
+// 判断当前帖子是否被点赞
 const isLiked = (post: any) => {
   const userId = getCurrentUserId()
   if (!userId || !post.likes) return false
   return post.likes.includes(userId)
 }
 
-// 🌟 处理点击小爱心点赞
+// 处理点击小爱心点赞
 const handleToggleLike = async (post: any) => {
   const token = localStorage.getItem('token')
   if (!token) {
@@ -181,7 +181,7 @@ const handleToggleLike = async (post: any) => {
   }
 }
 
-// 🌟 获取帖子列表
+// 获取帖子列表
 const fetchPosts = async () => {
   loading.value = true
   try {
@@ -198,20 +198,20 @@ const fetchPosts = async () => {
   }
 }
 
-// 🌟 标签过滤点击
+// 标签过滤点击
 const handleTagClick = (tag: string) => {
   if (selectedTag.value === tag) return 
   selectedTag.value = tag
   fetchPosts()
 }
 
-// 🌟 清除标签过滤
+// 清除标签过滤
 const clearFilter = () => {
   selectedTag.value = ''
   fetchPosts()
 }
 
-// 🌟 点击发布拦截
+// 点击发布拦截
 const handlePublishClick = () => {
   const token = localStorage.getItem('token')
   if (!token) {
@@ -222,7 +222,7 @@ const handlePublishClick = () => {
   isModalVisible.value = true
 }
 
-// 🌟 提交帖子
+// 提交帖子
 const submitPost = async () => {
   if (!newPost.value.title || !newPost.value.content) {
     message.error('标题和内容不能为空！')
