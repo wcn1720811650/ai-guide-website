@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { UserOutlined, LogoutOutlined } from '@ant-design/icons-vue'
+import { UserOutlined, LogoutOutlined, StarOutlined } from '@ant-design/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,6 +71,13 @@ const handleLogout = () => {
                       <a-menu-item key="profile">
                         <router-link to="/" style="color: inherit; text-decoration: none;">
                           <UserOutlined class="mr-2" /> 个人主页
+                        </router-link>
+                      </a-menu-item>
+                      <a-menu-divider />
+
+                      <a-menu-item key="favorites">
+                        <router-link to="/my-favorites" style="color: inherit; text-decoration: none;">
+                          <StarOutlined class="mr-2" /> 我的收藏
                         </router-link>
                       </a-menu-item>
                       

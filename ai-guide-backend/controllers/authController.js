@@ -126,3 +126,46 @@ exports.simulatePhoneScan = (req, res) => {
     res.status(400).json({ message: '二维码已失效' });
   }
 };
+
+// 切换收藏状态
+exports.toggleFavorite = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: '用户不存在' });
+
+    const index = user.favorites.indexOf(postId);
+    let isFavorited = false;
+
+    if (index === -1) {
+      user.favorites.push(postId); // 添加收藏
+      isFavorited = true;
+    } else {
+      user.favorites.splice(index, 1); // 移除收藏
+      isFavorited = false;
+    }
+
+    await user.save();
+    res.json({ message: isFavorited ? '已加入收藏' : '已取消收藏', isFavorited });
+  } catch (error) {
+    res.status(500).json({ message: '操作失败' });
+  }
+};
+
+// 获取当前用户的所有收藏帖子
+exports.getFavorites = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    // 使用 populate 把帖子 ID 变成完整的帖子对象
+    const user = await User.findById(userId).populate({
+      path: 'favorites',
+      options: { sort: { createdAt: -1 } } // 按最新收藏排序
+    });
+    
+    res.json(user.favorites);
+  } catch (error) {
+    res.status(500).json({ message: '获取收藏失败' });
+  }
+};

@@ -49,7 +49,15 @@
             <HeartOutlined v-else class="action-icon" />
             <span class="action-count">{{ likeCount > 0 ? likeCount : '点赞' }}</span>
           </div>
+
+          <div class="action-pill" :class="{ 'is-favorited': isFavorited }" @click="handleFavorite">
+            <StarFilled v-if="isFavorited" class="action-icon active-icon star-icon" />
+            <StarOutlined v-else class="action-icon" />
+            <span class="action-count">{{ isFavorited ? '已收藏' : '收藏' }}</span>
+          </div>  
         </div>
+
+        
 
         <div class="comments-section">
           <h3 class="comments-title">
@@ -134,7 +142,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { message } from 'ant-design-vue'
-import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled, DeleteOutlined } from '@ant-design/icons-vue'
+import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled, DeleteOutlined, StarOutlined, StarFilled } from '@ant-design/icons-vue'
 
 // 🌟 引入 Markdown 和 代码高亮核心库
 import { Marked } from 'marked'
@@ -154,6 +162,7 @@ const likeCount = ref(0)
 
 const newCommentContent = ref('')
 const submittingComment = ref(false)
+const isFavorited = ref(false)
 
 // ==========================================
 // 🚀 配置超强 Markdown 解析引擎
@@ -255,6 +264,38 @@ const parsedContent = computed(() => {
   return marked.parse(post.value.content)
 })
 
+// 在获取详情时，也要检查当前用户是否收藏了这篇文章
+const checkFavoriteStatus = async () => {
+  const token = localStorage.getItem('token')
+  if (!token || !post.value) return
+  try {
+    const res = await axios.get(
+      `http://localhost:3000/api/user/favorites`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    isFavorited.value = res.data.some((favPost: any) => favPost._id === post.value._id)
+  } catch (e) {
+    console.error('获取收藏状态失败', error)
+  }
+}
+
+const handleFavorite = async () => {
+  const token = localStorage.getItem('token')
+  if (!token) return message.warning('请登录后再收藏')
+
+  try {
+    const res = await axios.post(
+      `http://localhost:3000/api/user/favorites/${post.value._id}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    isFavorited.value = res.data.isFavorited
+    if (isFavorited.value) message.success('收藏成功，可在个人中心查看')
+  } catch (error) {
+    message.error('收藏失败')
+  }
+}
+
 // ==========================================
 // 获取帖子详情逻辑
 // ==========================================
@@ -264,6 +305,7 @@ const fetchPostDetail = async () => {
     const res = await axios.get(`http://localhost:3000/api/posts/${postId}`)
     post.value = res.data
     
+    await checkFavoriteStatus()
     // 初始化点赞状态
     const token = localStorage.getItem('token')
     if (token) {
@@ -375,7 +417,7 @@ onMounted(() => {
 
 .post-actions {
   display: flex;
-  justify-content: flex-start; /* 左对齐，显得更克制。如果是居中可以改成 center */
+  justify-content: space-between; /* 左对齐，显得更克制。如果是居中可以改成 center */
   margin-top: 40px;
   padding-top: 24px;
 }
@@ -412,16 +454,25 @@ onMounted(() => {
   transform: scale(1.15); /* 悬浮时图标微动 */
 }
 
-/* 🌟 点赞后的激活状态 */
+/* 点赞后的激活状态 */
 .action-pill.is-liked {
   color: #f43f5e;
   border-color: #fecdd3;
   background-color: #fff1f2;
 }
-
 .action-pill.is-liked:hover {
   background-color: #ffe4e6;
   border-color: #fda4af;
+}
+
+.action-pill.is-favorited {
+  color: #f59e0b; 
+  border-color: #fde68a; 
+  background-color: #fffbeb;
+}
+.action-pill.is-favorited:hover {
+  background-color: #fef3c7; 
+  border-color: #fcd34d;
 }
 
 .active-icon {
