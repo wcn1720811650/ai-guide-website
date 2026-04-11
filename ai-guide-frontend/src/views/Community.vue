@@ -238,7 +238,7 @@ const submitPost = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     )
     
-    message.success('发布成功！')
+    message.success('发布成功！内容已提交管理员审核，通过后即可展示。')
     isModalVisible.value = false
     newPost.value = { title: '', content: '', tags: [] } // 清空表单，注意也要清空 tags
     fetchPosts()

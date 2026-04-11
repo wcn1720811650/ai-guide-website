@@ -8,6 +8,13 @@ const authMiddleware = require('../middlewares/auth');
 router.get('/', postController.getPosts);
 router.get('/:id', postController.getPostById);
 
+// 管理员专用路由
+router.get('/admin/list', authMiddleware, postController.getAdminPosts);
+router.put('/admin/:id/status', authMiddleware, postController.reviewPost);
+
+// 用户举报路由
+router.post('/:id/report', authMiddleware, postController.reportPost);
+
 // 必须经过 authMiddleware 检查（必须登录）才能发帖
 router.post('/', authMiddleware, postController.createPost);
 router.post('/:id/like', authMiddleware, postController.toggleLike);

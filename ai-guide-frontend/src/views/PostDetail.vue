@@ -13,9 +13,9 @@
           <div class="post-meta">
             <div class="meta-left">
               <a-avatar size="small" class="author-avatar bg-[#10b981]">
-                {{ post.authorName.charAt(0).toUpperCase() }}
+                {{ post.authorName.charAt(0).toUpperCase()}}
               </a-avatar>
-              <span class="author-name">{{ post.authorName }}</span>
+              <span class="author-name">{{ post.authorName}}</span>
               <span class="meta-divider">•</span>
               <span class="time-text">{{ new Date(post.createdAt).toLocaleString() }}</span>
             </div>
@@ -50,14 +50,27 @@
             <span class="action-count">{{ likeCount > 0 ? likeCount : '点赞' }}</span>
           </div>
 
+          <span class="report-btn" @click="isReportModalVisible = true">
+            <WarningOutlined /> 举报违规
+          </span>
+
+          <a-modal v-model:open="isReportModalVisible" title="举报违规内容" @ok="submitReport" :confirmLoading="submittingReport">
+            <a-radio-group v-model:value="reportReason" class="flex flex-col gap-2 mb-4">
+              <a-radio value="垃圾广告或营销">垃圾广告或营销</a-radio>
+              <a-radio value="色情、暴力或血腥">色情、暴力或血腥</a-radio>
+              <a-radio value="政治敏感或违法信息">政治敏感或违法信息</a-radio>
+              <a-radio value="人身攻击或网暴">人身攻击或网暴</a-radio>
+              <a-radio value="其他">其他</a-radio>
+            </a-radio-group>
+            <a-textarea v-model:value="reportDetail" placeholder="补充详细说明 (选填)..." :rows="3" />
+          </a-modal>
+
           <div class="action-pill" :class="{ 'is-favorited': isFavorited }" @click="handleFavorite">
             <StarFilled v-if="isFavorited" class="action-icon active-icon star-icon" />
             <StarOutlined v-else class="action-icon" />
             <span class="action-count">{{ isFavorited ? '已收藏' : '收藏' }}</span>
           </div>  
         </div>
-
-        
 
         <div class="comments-section">
           <h3 class="comments-title">
@@ -142,7 +155,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { message } from 'ant-design-vue'
-import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled, DeleteOutlined, StarOutlined, StarFilled } from '@ant-design/icons-vue'
+import { ArrowLeftOutlined, EyeOutlined, HeartOutlined, HeartFilled, DeleteOutlined, StarOutlined, StarFilled, WarningOutlined } from '@ant-design/icons-vue'
 
 // 🌟 引入 Markdown 和 代码高亮核心库
 import { Marked } from 'marked'
@@ -164,9 +177,34 @@ const newCommentContent = ref('')
 const submittingComment = ref(false)
 const isFavorited = ref(false)
 
-// ==========================================
-// 🚀 配置超强 Markdown 解析引擎
-// ==========================================
+const isReportModalVisible = ref(false)
+const submittingReport = ref(false)
+const reportReason = ref('垃圾广告或营销')
+const reportDetail = ref('')
+
+// 举报帖子
+const submitReport = async () => {
+  const token = localStorage.getItem('token')
+  if (!token) return message.warning('请先登录后再举报')
+  
+  submittingReport.value = true
+  try {
+    const finalReason = reportDetail.value ? `${reportReason.value} - ${reportDetail.value}` : reportReason.value
+    await axios.post(
+      `http://localhost:3000/api/posts/${post.value._id}/report`,
+      { reason: finalReason },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    message.success('感谢您的监督，举报已提交')
+    isReportModalVisible.value = false
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '举报失败')
+  } finally {
+    submittingReport.value = false
+  }
+}
+
+// 配置超强 Markdown 解析引擎
 const marked = new Marked(
   markedHighlight({
     langPrefix: 'hljs language-',
@@ -178,7 +216,7 @@ const marked = new Marked(
   })
 )
 
-// 🌟 提交评论方法
+// 提交评论方法
 const submitComment = async () => {
   if (!newCommentContent.value.trim()) {
     message.warning('写点什么再发布吧~')
@@ -728,8 +766,18 @@ onMounted(() => {
   line-height: 1;
 }
 
-/* 确保两个标签同时出现时有间距 */
 .author-badge + .me-badge {
   margin-left: 4px;
+}
+
+.report-btn {
+  font-size: 13px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s;
+  margin-left: 12px;
+}
+.report-btn:hover {
+  color: #ef4444; /* 悬浮变成警告红 */
 }
 </style>

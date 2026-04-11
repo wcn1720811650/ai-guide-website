@@ -1,11 +1,11 @@
 // controllers/postController.js
 const Post = require('../models/Post');
 
-// 🌟 获取帖子列表 (所有人可见)
+// 获取帖子列表 (所有人可见)
 exports.getPosts = async (req, res) => {
   try {
     const { tag } = req.query;
-    let query = {};
+    let query = { status: 'approved' };
     if (tag) {
       query.tags = tag; 
     }
@@ -18,7 +18,68 @@ exports.getPosts = async (req, res) => {
   }
 };
 
-// 🌟 发布新帖子 (仅登录用户)
+// 用户举报帖子
+exports.reportPost = async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { reason } = req.body;
+    const userId = req.user.userId;
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: '帖子不存在' });
+
+    // 防止重复举报
+    const hasReported = post.reports.some(r => r.userId.toString() === userId);
+    if (hasReported) return res.status(400).json({ message: '您已经举报过该内容，请勿重复提交' });
+
+    post.reports.push({ userId, reason });
+    
+    // 如果举报人数超过 3 人，可以自动将其重新打回待审核状态 (防范机制)
+    if (post.reports.length >= 3) {
+      post.status = 'pending';
+    }
+
+    await post.save();
+    res.json({ message: '举报成功，我们会尽快核实处理' });
+  } catch (error) {
+    res.status(500).json({ message: '举报失败' });
+  }
+};
+
+// 管理员专用 - 获取待审核与被举报列表
+exports.getAdminPosts = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: '权限不足' });
+
+    // 查询处于待审核状态，或者有举报记录的帖子
+    const posts = await Post.find({
+      $or: [
+        { status: 'pending' },
+        { 'reports.0': { $exists: true } } // 包含任何举报
+      ]
+    }).sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ message: '获取管理列表失败' });
+  }
+};
+
+// 追加：管理员专用 - 审批帖子 (通过/拒绝)
+exports.reviewPost = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: '权限不足' });
+
+    const { id } = req.params;
+    const { status } = req.body; // 'approved' 或 'rejected'
+
+    const post = await Post.findByIdAndUpdate(id, { status, reports: [] }, { new: true });
+    res.json({ message: '审批操作成功', post });
+  } catch (error) {
+    res.status(500).json({ message: '审批失败' });
+  }
+};
+
+// 发布新帖子 (仅登录用户)
 exports.createPost = async (req, res) => {
   try {
     const { title, content, tags } = req.body;
@@ -44,16 +105,16 @@ exports.createPost = async (req, res) => {
 exports.getPostById = async (req, res) => {
     try {
       const postId = req.params.id;
-      const post = await Post.findById(postId);
+      const post = await Post.findByIdAndUpdate(
+        postId,
+        { $inc: { views: 1 } }, 
+        { returnDocument: 'after' } 
+      );
       
       if (!post) {
         return res.status(404).json({ message: '帖子不存在或已被删除' });
       }
-  
-      // 有人点进来，阅读量自动 +1
-      post.views = (post.views || 0) + 1;
-      await post.save();
-  
+
       res.json(post);
     } catch (error) {
       console.error('获取帖子详情错误:', error);
