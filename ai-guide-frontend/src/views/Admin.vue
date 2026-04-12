@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
@@ -7,12 +7,10 @@ import type { Article } from '../types/index'
 
 const router = useRouter()
 
-// ==========================================
 // 登录状态与鉴权
-// ==========================================
 const isAuthorized = ref(false)
 const secretKey = ref('')
-const token = ref('') // 存 JWT token
+const token = ref('') 
 
 const checkAuth = async () => {
   try {
@@ -22,8 +20,6 @@ const checkAuth = async () => {
     token.value = res.data.token
     isAuthorized.value = true
     message.success('口令正确，欢迎站长！')
-    
-    // 登录成功后，同时拉取官方文章和待审核 UGC
     fetchArticles()
     fetchUgcPosts()
   } catch {
@@ -32,10 +28,8 @@ const checkAuth = async () => {
   }
 }
 
-// 统一的鉴权 header
 const authHeader = () => ({ headers: { Authorization: `Bearer ${token.value}` } })
 
-// 统一的错误处理
 const handleError = (error: any, fallbackMsg: string) => {
   if (error.response?.status === 401) {
     isAuthorized.value = false
@@ -46,9 +40,7 @@ const handleError = (error: any, fallbackMsg: string) => {
   }
 }
 
-// ==========================================
-// 🌟 官方文章管理状态与逻辑
-// ==========================================
+// 官方文章管理
 const articles = ref<Article[]>([])
 const isLoadingTable = ref(false)
 const isSubmitting = ref(false)
@@ -129,29 +121,28 @@ const resetForm = () => {
   Object.assign(formState, { id: '', title: '', desc: '', content: '', categoryId: 'basic', author: '站长' })
 }
 
-// ==========================================
-// 🌟 UGC 内容审核状态与逻辑
-// ==========================================
-const activeTab = ref('ugc') // 默认展示 UGC 审核页
-const ugcPosts = ref<any[]>([])
+// UGC 核心管理逻辑 (分拣)
+const activeTab = ref('ugc') 
+const allAdminPosts = ref<any[]>([])
 const loadingUgc = ref(false)
 
-const ugcColumns = [
-  { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true, width: 250 },
-  { title: '作者', dataIndex: 'authorName', key: 'authorName' },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '风险警告', key: 'reports', width: 120 },
-  { title: '发布时间', dataIndex: 'createdAt', key: 'createdAt' },
-  { title: '操作', key: 'action', width: 200 }
-]
+// 分拣 1：审核收件箱
+const ugcInbox = computed(() => {
+  return allAdminPosts.value.filter(p => p.status !== 'rejected')
+})
+
+// 分拣 2：回收站
+const rejectedPosts = computed(() => {
+  return allAdminPosts.value.filter(p => p.status === 'rejected')
+})
 
 const fetchUgcPosts = async () => {
   loadingUgc.value = true
   try {
     const res = await axios.get('http://localhost:3000/api/posts/admin/list', authHeader())
-    ugcPosts.value = res.data
+    allAdminPosts.value = res.data
   } catch (error) {
-    handleError(error, '获取审核列表失败，请确认您具有管理员权限')
+    handleError(error, '获取审核列表失败')
   } finally {
     loadingUgc.value = false
   }
@@ -161,15 +152,21 @@ const handleReview = async (id: string, status: string) => {
   try {
     await axios.put(`http://localhost:3000/api/posts/admin/${id}/status`, { status }, authHeader())
     message.success(status === 'approved' ? '✅ 已批准发布' : '🚫 已打回拒绝')
-    fetchUgcPosts() // 刷新列表
+    fetchUgcPosts() 
   } catch (error) {
     handleError(error, '操作失败')
   }
 }
 
-// ==========================================
-// 🌟 预览弹窗与快捷审核逻辑
-// ==========================================
+const calculateRemainingDays = (date: string) => {
+  if (!date) return 30
+  const rejectedTime = new Date(date).getTime()
+  const now = new Date().getTime()
+  const daysPassed = Math.floor((now - rejectedTime) / (1000 * 60 * 60 * 24))
+  return Math.max(0, 30 - daysPassed)
+}
+
+// 预览弹窗
 const isPreviewVisible = ref(false)
 const currentPreviewPost = ref<any>(null)
 
@@ -178,10 +175,11 @@ const handlePreview = (record: any) => {
   isPreviewVisible.value = true
 }
 
+
 const reviewFromPreview = async (status: string) => {
   if (currentPreviewPost.value) {
     await handleReview(currentPreviewPost.value._id, status)
-    isPreviewVisible.value = false // 审批完后自动关闭弹窗
+    isPreviewVisible.value = false
   }
 }
 </script>
@@ -197,55 +195,54 @@ const reviewFromPreview = async (status: string) => {
 
     <div v-else>
       <div style="margin-bottom: 24px; text-align: center;">
-        <h1 style="font-size: 32px; font-weight: bold;">🛡️ AI 社区后台控制中心</h1>
+        <h1 style="font-size: 32px; font-weight: bold;">🛡️ AI 社区控制中心</h1>
       </div>
 
       <a-tabs v-model:activeKey="activeTab" type="card" size="large">
         
-        <a-tab-pane key="ugc" tab="⚖️ UGC 内容审核">
+        <a-tab-pane key="ugc" tab="⚖️ 内容审核 (Inbox)">
           <a-card style="border-radius: 0 12px 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 40px;">
             <a-table 
-              :dataSource="ugcPosts" 
-              :columns="ugcColumns" 
+              :dataSource="ugcInbox" 
+              :columns="[
+                { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
+                { title: '作者', dataIndex: 'authorName', key: 'authorName' },
+                { title: '状态', key: 'status' },
+                { title: '风险警告', key: 'reports' },
+                { title: '操作', key: 'action' }
+              ]" 
               rowKey="_id"
               :loading="loadingUgc"
               bordered
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'status'">
-                  <a-tag :color="record.status === 'pending' ? 'warning' : (record.status === 'approved' ? 'success' : 'error')">
-                    {{ record.status === 'pending' ? '待审核' : (record.status === 'approved' ? '已通过' : '已拒绝') }}
+                  <a-tag :color="record.status === 'pending' ? 'warning' : 'success'">
+                    {{ record.status === 'pending' ? '待审核' : '已通过' }}
                   </a-tag>
                 </template>
-
                 <template v-if="column.key === 'reports'">
-                  <a-popover title="举报理由" v-if="record.reports && record.reports.length > 0">
+                  <a-popover title="举报理由" v-if="record.reports?.length > 0">
                     <template #content>
-                      <div v-for="(r, i) in record.reports" :key="i" style="max-width: 200px;">
-                        {{ i+1 }}. {{ r.reason }}
-                      </div>
+                      <div v-for="(r, i) in record.reports" :key="i">{{ i+1 }}. {{ r.reason }}</div>
                     </template>
                     <a-tag color="red" style="cursor: pointer;">{{ record.reports.length }} 条举报</a-tag>
                   </a-popover>
                   <span v-else style="color: #9ca3af;">安全</span>
                 </template>
-
-                <template v-if="column.key === 'createdAt'">
-                  {{ new Date(record.createdAt).toLocaleString() }}
-                </template>
-
                 <template v-if="column.key === 'action'">
-                  <a-button type="link" @click="handleReview(record._id, 'approved')" style="color: #10b981; padding: 0 8px;">保留帖子</a-button>
-                  <a-button type="link" danger @click="handleReview(record._id, 'rejected')" style="padding: 0 8px;">删除帖子</a-button>
-                  <a-button type="link" @click="handlePreview(record)" style="padding: 0 8px;">预览</a-button>
+                  <a-button type="link" @click="handleReview(record._id, 'approved')" style="color: #10b981;">通过</a-button>
+                  <a-button type="link" danger @click="handleReview(record._id, 'rejected')">拒绝</a-button>
+                  <a-button type="link" @click="handlePreview(record)">预览</a-button>
                 </template>
               </template>
             </a-table>
           </a-card>
         </a-tab-pane>
 
-        <a-tab-pane key="articles" tab="📝 官方文章管理">
+        <a-tab-pane key="articles" tab="📝 官方管理">
           <div style="background: #fff; padding: 24px; border-radius: 0 12px 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            
             <div style="margin-bottom: 24px;">
               <h2 style="font-size: 20px; font-weight: bold;">
                 {{ isEditing ? '✏️ 修改文章' : '🚀 发布新文章' }}
@@ -290,15 +287,10 @@ const reviewFromPreview = async (status: string) => {
                 <a-button v-if="isEditing" @click="resetForm">取消编辑</a-button>
               </a-form-item>
             </a-form>
+            <a-divider />
 
-            <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">📚 已发布文章管理</h2>
-            <a-table 
-              :dataSource="articles" 
-              :columns="articleColumns" 
-              rowKey="id"
-              :loading="isLoadingTable"
-              bordered
-            >
+            <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">📚 官方文章库</h2>
+            <a-table :dataSource="articles" :columns="articleColumns" rowKey="id" :loading="isLoadingTable" bordered>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'action'">
                   <a-button type="link" @click="handleEdit(record)">编辑</a-button>
@@ -309,68 +301,63 @@ const reviewFromPreview = async (status: string) => {
           </div>
         </a-tab-pane>
 
+        <a-tab-pane key="trash" tab="🗑️ 已拒绝内容">
+          <a-card style="border-radius: 0 12px 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <div style="margin-bottom: 16px; color: #6b7280; font-size: 13px;">
+              💡 提示：被拒绝的内容将保留 30 天，逾期将自动彻底销毁。
+            </div>
+            <a-table 
+              :dataSource="rejectedPosts" 
+              :columns="[
+                { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
+                { title: '作者', dataIndex: 'authorName', key: 'authorName' },
+                { title: '状态', key: 'status' },
+                { title: '销毁倒计时', key: 'expiry' },
+                { title: '操作', key: 'action' }
+              ]" 
+              rowKey="_id"
+              :loading="loadingUgc"
+              bordered
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag color="error">已打回</a-tag>
+                </template>
+                <template v-if="column.key === 'expiry'">
+                  <span style="color: #ef4444; font-weight: 500;">
+                    剩余 {{ calculateRemainingDays(record.rejectedAt) }} 天
+                  </span>
+                </template>
+                <template v-if="column.key === 'action'">
+                  <a-button type="link" @click="handleReview(record._id, 'approved')" style="color: #10b981;">恢复发布</a-button>
+                  <a-button type="link" @click="handlePreview(record)">详情</a-button>
+                </template>
+              </template>
+            </a-table>
+          </a-card>
+        </a-tab-pane>
+
       </a-tabs>
     </div>
 
-    <a-modal
-      v-model:open="isPreviewVisible"
-      title="🔍 UGC 内容预览与审核"
-      width="800px"
-      :footer="null" 
-      destroyOnClose
-    >
+    <a-modal v-model:open="isPreviewVisible" title="🔍 内容详情" width="800px" :footer="null" destroyOnClose>
       <div v-if="currentPreviewPost" style="padding: 10px 0;">
-        <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 12px; color: #111827;">
-          {{ currentPreviewPost.title }}
-        </h2>
-        
-        <div style="display: flex; gap: 16px; margin-bottom: 16px; color: #6b7280; font-size: 14px;">
+        <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 12px;">{{ currentPreviewPost.title }}</h2>
+        <div style="display: flex; gap: 16px; margin-bottom: 16px; color: #6b7280;">
           <span>👤 作者：{{ currentPreviewPost.authorName }}</span>
-          <span>🕒 时间：{{ new Date(currentPreviewPost.createdAt).toLocaleString() }}</span>
           <a-tag :color="currentPreviewPost.status === 'pending' ? 'warning' : (currentPreviewPost.status === 'approved' ? 'success' : 'error')">
-            {{ currentPreviewPost.status === 'pending' ? '当前：待审核' : (currentPreviewPost.status === 'approved' ? '当前：已通过' : '当前：已拒绝') }}
+            {{ currentPreviewPost.status === 'pending' ? '待审核' : (currentPreviewPost.status === 'approved' ? '已通过' : '已拒绝') }}
           </a-tag>
         </div>
-
-        <a-alert 
-          v-if="currentPreviewPost.reports && currentPreviewPost.reports.length > 0" 
-          type="error" 
-          show-icon 
-          style="margin-bottom: 16px;"
-        >
-          <template #message>
-            <strong>风险警告：收到 {{ currentPreviewPost.reports.length }} 条用户举报</strong>
-            <ul style="margin: 8px 0 0 16px; padding: 0;">
-              <li v-for="(r, i) in currentPreviewPost.reports" :key="i">{{ r.reason }}</li>
-            </ul>
-          </template>
-        </a-alert>
-
-        <a-divider style="margin: 16px 0;" />
-        
-        <div style="white-space: pre-wrap; word-wrap: break-word; line-height: 1.8; font-size: 15px; color: #374151; max-height: 50vh; overflow-y: auto; padding-right: 8px;">
+        <a-divider />
+        <div style="white-space: pre-wrap; font-size: 15px; color: #374151; max-height: 50vh; overflow-y: auto;">
           {{ currentPreviewPost.content }}
         </div>
-
-        <a-divider style="margin: 16px 0;" />
-        
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
-          <a-button @click="isPreviewVisible = false">仅关闭</a-button>
-          
-          <a-button 
-            danger 
-            @click="reviewFromPreview('rejected')"
-          >
-            删除帖子
-          </a-button>
-          
-          <a-button 
-            type="primary" 
-            style="background-color: #10b981; border-color: #10b981;" 
-            @click="reviewFromPreview('approved')"
-          >
-            保留帖子
-          </a-button>
+        <a-divider />
+        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+          <a-button @click="isPreviewVisible = false">关闭</a-button>
+          <a-button danger @click="reviewFromPreview('rejected')" v-if="currentPreviewPost.status !== 'rejected'">拒绝</a-button>
+          <a-button type="primary" style="background-color: #10b981; border-color: #10b981;" @click="reviewFromPreview('approved')" v-if="currentPreviewPost.status !== 'approved'">批准</a-button>
         </div>
       </div>
     </a-modal>

@@ -49,6 +49,8 @@ const postSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'], 
     default: 'pending' 
   },
+  // 记录被拒绝的时间，用于触发自动清理
+  rejectedAt: { type: Date, default: null },
   reports: [
     {
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -61,5 +63,6 @@ const postSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+postSchema.index({ rejectedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
 
 module.exports = mongoose.model('Post', postSchema);

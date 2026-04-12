@@ -51,20 +51,22 @@ exports.getAdminPosts = async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ message: '权限不足' });
 
-    // 查询处于待审核状态，或者有举报记录的帖子
-    const posts = await Post.find({
+    // 只拉取：待审核、已拒绝、或者 (已通过 但 收到举报) 的帖子
+    const query = {
       $or: [
         { status: 'pending' },
-        { 'reports.0': { $exists: true } } // 包含任何举报
+        { status: 'rejected' },
+        { status: 'approved', 'reports.0': { $exists: true } } // 只要 reports 数组里有数据
       ]
-    }).sort({ createdAt: -1 });
+    };
+    const posts = await Post.find(query).sort({ createdAt: -1 });
     res.json(posts);
   } catch (error) {
     res.status(500).json({ message: '获取管理列表失败' });
   }
 };
 
-// 追加：管理员专用 - 审批帖子 (通过/拒绝)
+// 管理员专用 - 审批帖子 (通过/拒绝)
 exports.reviewPost = async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ message: '权限不足' });
@@ -72,7 +74,16 @@ exports.reviewPost = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // 'approved' 或 'rejected'
 
-    const post = await Post.findByIdAndUpdate(id, { status, reports: [] }, { new: true });
+    const updateData = { status, reports: [] };
+    
+    // 如果是拒绝，开始 30 天倒计时；如果是通过，中断倒计时
+    if (status === 'rejected') {
+      updateData.rejectedAt = new Date();
+    } else {
+      updateData.rejectedAt = null; 
+    }
+
+    const post = await Post.findByIdAndUpdate(id, updateData, { new: true });
     res.json({ message: '审批操作成功', post });
   } catch (error) {
     res.status(500).json({ message: '审批失败' });
@@ -84,7 +95,6 @@ exports.createPost = async (req, res) => {
   try {
     const { title, content, tags } = req.body;
     
-    // 这里的 req.user 是通过你之前写的 authMiddleware (保安) 挂载上来的！
     const newPost = new Post({
       title,
       content,
