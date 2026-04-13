@@ -15,7 +15,11 @@
               <a-avatar size="small" class="author-avatar bg-[#10b981]">
                 {{ post.authorName.charAt(0).toUpperCase()}}
               </a-avatar>
-              <span class="author-name">{{ post.authorName}}</span>
+              <span 
+                @click="router.push(`/user/${post.author}`)"
+              >
+                <span class="author-tag">{{ post.authorName || '未知作者' }}</span>
+              </span>
               <span class="meta-divider">•</span>
               <span class="time-text">{{ new Date(post.createdAt).toLocaleString() }}</span>
             </div>
@@ -449,7 +453,7 @@ onMounted(() => {
   margin-right: -200px;
   gap: 8px;
 }
-.meta-left { display: flex; align-items: center; gap: 8px; }
+.meta-left { display: flex; align-items: center; gap: 15px; }
 .author-name { font-weight: 600; color: #374151; }
 .meta-divider { color: #d1d5db; }
 
@@ -779,5 +783,24 @@ onMounted(() => {
 }
 .report-btn:hover {
   color: #ef4444; /* 悬浮变成警告红 */
+}
+
+.author-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px; 
+  margin-left: -8px; 
+  border-radius: 6px;
+  
+  color: #10b981; 
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+
+.author-tag:hover {
+  cursor: pointer;
+  background-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
 }
 </style>

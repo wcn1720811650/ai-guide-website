@@ -52,7 +52,11 @@
 
           <div class="card-footer">
             <div class="post-meta">
-              <span class="author-tag">发布者: {{ post.authorName }}</span>
+              <span 
+                @click.stop="router.push(`/user/${post.author}`)"
+              >
+                <span class="author-tag">发布者: {{ post.authorName }}</span>
+              </span>
               <span class="time-tag">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
             </div>
 
@@ -347,10 +351,22 @@ onMounted(() => {
 }
 
 .author-tag {
-  color: #10b981;
-  background-color: #ecfdf5;
-  padding: 2px 8px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px; 
+  margin-left: -8px; 
+  border-radius: 6px;
+  
+  color: #10b981; 
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+
+.author-tag:hover {
+  background-color: #10b981;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
 }
 
 .time-tag {

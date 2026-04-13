@@ -8,11 +8,12 @@ const route = useRoute()
 const router = useRouter()
 
 const currentUsername = ref('')
-
+const currentUserId = ref('')
 watch(
   () => route.path,
   () => {
     currentUsername.value = localStorage.getItem('username') || ''
+    currentUserId.value = localStorage.getItem('userId') || ''
   },
   { immediate: true }
 )
@@ -20,7 +21,9 @@ watch(
 const handleLogout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('username')
+  localStorage.removeItem('userId')
   currentUsername.value = ''
+  currentUserId.value = ''
   
   message.success('已安全退出当前账号')
   router.push('/login')
@@ -68,10 +71,8 @@ const handleLogout = () => {
                         <div>{{ currentUsername }}</div>
                       </div>
                       
-                      <a-menu-item key="profile">
-                        <router-link to="/" style="color: inherit; text-decoration: none;">
-                          <UserOutlined class="mr-2" /> 个人主页
-                        </router-link>
+                      <a-menu-item key="profile" @click="router.push(`/user/${currentUserId}`)">
+                        <UserOutlined class="mr-2" /> 个人主页
                       </a-menu-item>
                       <a-menu-divider />
 

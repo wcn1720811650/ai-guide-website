@@ -67,7 +67,8 @@ exports.login = async (req, res) => {
     res.json({ 
       message: '✅ 登录成功！', 
       token: token,
-      username: user.username 
+      username: user.username,
+      userId: user._id
     });
   } catch (error) {
     console.error('登录错误:', error);

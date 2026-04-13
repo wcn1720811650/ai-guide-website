@@ -158,9 +158,12 @@
   
       const token = res.data.token
       const username = res.data.username
+      
       localStorage.setItem('token', token)
       localStorage.setItem('username', username)
-  
+      localStorage.setItem('userId', res.data.userId)
+      console.log(localStorage.getItem('userId'));
+      
       successMessage.value = '身份验证通过，正在接入系统...'
   
       setTimeout(() => {

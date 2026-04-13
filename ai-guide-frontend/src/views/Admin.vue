@@ -200,7 +200,7 @@ const reviewFromPreview = async (status: string) => {
 
       <a-tabs v-model:activeKey="activeTab" type="card" size="large">
         
-        <a-tab-pane key="ugc" tab="⚖️ 内容审核 (Inbox)">
+        <a-tab-pane key="ugc" tab="⚖️ 内容审核 ">
           <a-card style="border-radius: 0 12px 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 40px;">
             <a-table 
               :dataSource="ugcInbox" 
