@@ -9,6 +9,7 @@ import Register from '@/views/Register.vue'
 import Login from '@/views/Login.vue'
 import Community from '@/views/Community.vue'
 import PostDetail from '../views/PostDetail.vue'
+import PostEdit from '../views/PostEdit.vue'
 import MyFavorites from '../views/MyFavorites.vue'
 import UserProfile from '../views/UserProfile.vue'
 // 🌟 重点在这里：声明 routes 是一个 RouteRecordRaw 类型的数组
@@ -57,6 +58,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/post/:id',
     name: 'PostDetail',
     component: PostDetail
+  },
+  {
+    path: '/post/:id/edit',
+    name: 'PostEdit',
+    component: PostEdit
   },
   {
     path: '/my-favorites',

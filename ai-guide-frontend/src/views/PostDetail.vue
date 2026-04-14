@@ -262,6 +262,7 @@ const currentUserId = computed(() => {
   } catch (e) { return null }
 })
 
+
 // 判断评论是否被当前用户点赞
 const isCommentLiked = (comment: any) => {
   const userId = currentUserId.value
@@ -317,7 +318,7 @@ const checkFavoriteStatus = async () => {
     )
     isFavorited.value = res.data.some((favPost: any) => favPost._id === post.value._id)
   } catch (e) {
-    console.error('获取收藏状态失败', error)
+    console.error('获取收藏状态失败', e)
   }
 }
 
@@ -344,12 +345,14 @@ const handleFavorite = async () => {
 const fetchPostDetail = async () => {
   const postId = route.params.id
   try {
-    const res = await axios.get(`http://localhost:3000/api/posts/${postId}`)
+    const token = localStorage.getItem('token')
+    const res = await axios.get(`http://localhost:3000/api/posts/${postId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    })
     post.value = res.data
     
     await checkFavoriteStatus()
     // 初始化点赞状态
-    const token = localStorage.getItem('token')
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]))
@@ -456,6 +459,7 @@ onMounted(() => {
 .meta-left { display: flex; align-items: center; gap: 15px; }
 .author-name { font-weight: 600; color: #374151; }
 .meta-divider { color: #d1d5db; }
+
 
 .post-actions {
   display: flex;

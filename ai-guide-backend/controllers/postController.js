@@ -1,5 +1,8 @@
 // controllers/postController.js
 const Post = require('../models/Post');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here_super_safe';
 
 // 获取帖子列表 (所有人可见)
 exports.getPosts = async (req, res) => {
@@ -87,6 +90,37 @@ exports.getAdminPosts = async (req, res) => {
   }
 };
 
+exports.updatePost = async (req, res) => {
+  try {
+    const postId = req.params.id
+    const userId = req.user.userId
+    const { title, content, tags } = req.body
+
+    if (!title || !content) {
+      return res.status(400).json({ message: '标题和内容不能为空' })
+    }
+
+    const post = await Post.findById(postId)
+    if (!post) return res.status(404).json({ message: '帖子不存在' })
+
+    if (post.author.toString() !== userId) {
+      return res.status(403).json({ message: '无权编辑他人帖子' })
+    }
+
+    post.title = String(title).trim()
+    post.content = String(content)
+    post.tags = Array.isArray(tags) ? tags : []
+    post.status = 'pending'
+    post.rejectedAt = null
+    post.reports = []
+
+    await post.save()
+    res.json({ message: '修改已提交审核', post })
+  } catch (error) {
+    res.status(500).json({ message: '修改失败' })
+  }
+}
+
 // 管理员专用 - 审批帖子 (通过/拒绝)
 exports.reviewPost = async (req, res) => {
   try {
@@ -136,15 +170,36 @@ exports.createPost = async (req, res) => {
 exports.getPostById = async (req, res) => {
     try {
       const postId = req.params.id;
-      const post = await Post.findByIdAndUpdate(
-        postId,
-        { $inc: { views: 1 } }, 
-        { returnDocument: 'after' } 
-      );
+      const existing = await Post.findById(postId);
       
-      if (!post) {
+      if (!existing) {
         return res.status(404).json({ message: '帖子不存在或已被删除' });
       }
+
+      if (existing.status !== 'approved') {
+        const authHeader = req.header('Authorization')
+        if (!authHeader) {
+          return res.status(403).json({ message: '该内容正在审核中，暂不可查看' })
+        }
+
+        try {
+          const token = authHeader.replace('Bearer ', '')
+          const decoded = jwt.verify(token, JWT_SECRET)
+          const canView = decoded.role === 'admin' || String(decoded.userId) === String(existing.author)
+          if (!canView) {
+            return res.status(403).json({ message: '无权查看该内容' })
+          }
+          return res.json(existing)
+        } catch {
+          return res.status(401).json({ message: '身份令牌已失效或过期，请重新登录' })
+        }
+      }
+
+      const post = await Post.findByIdAndUpdate(
+        postId,
+        { $inc: { views: 1 } },
+        { returnDocument: 'after' }
+      );
 
       res.json(post);
     } catch (error) {

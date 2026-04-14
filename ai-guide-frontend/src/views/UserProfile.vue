@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { UserOutlined, CalendarOutlined, LikeOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
+import { UserOutlined, CalendarOutlined, LikeOutlined, FileTextOutlined, ArrowLeftOutlined, EditOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
@@ -24,6 +24,22 @@ const userInfo = ref<any>(null)
 const userStats = ref({ postCount: 0, totalLikes: 0 })
 const userPosts = ref<any[]>([])
 const loading = ref(true)
+
+const currentUserId = computed(() => {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.userId || payload.id
+  } catch {
+    return null
+  }
+})
+
+const isOwnProfile = computed(() => {
+  const routeId = String(route.params.id || '')
+  return !!currentUserId.value && currentUserId.value === routeId
+})
 
 const topPostsOption = computed(() => {
   if (!userPosts.value.length) return null
@@ -196,7 +212,19 @@ watch(
 
         <div class="post-grid" v-else>
           <div v-for="post in userPosts" :key="post._id" class="post-card" @click="router.push(`/post/${post._id}`)">
-            <h3 class="post-title">{{ post.title }}</h3>
+            <div class="post-card-header">
+              <h3 class="post-title">{{ post.title }}</h3>
+              <a-button
+                v-if="isOwnProfile"
+                type="text"
+                size="small"
+                class="edit-btn"
+                @click.stop="router.push(`/post/${post._id}/edit`)"
+              >
+                <EditOutlined />
+                <span class="edit-text">编辑</span>
+              </a-button>
+            </div>
             <p class="post-desc">{{ post.content.substring(0, 80) }}...</p>
             <div class="post-meta">
               <a-tag color="blue" v-if="post.tags && post.tags.length > 0">{{ post.tags[0] }}</a-tag>
@@ -350,6 +378,39 @@ watch(
   transition: all 0.3s ease;
 }
 
+.post-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 26px;
+  color: #6b7280;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.post-card:hover .edit-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.edit-btn:hover {
+  color: #10b981;
+}
+
+.edit-text {
+  font-size: 12px;
+}
+
 .post-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0,0,0,0.08);
@@ -359,8 +420,9 @@ watch(
 .post-title {
   font-size: 18px;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   color: #111827;
+  flex: 1;
 }
 
 .post-desc {
@@ -399,6 +461,11 @@ watch(
 
   .charts-grid {
     grid-template-columns: 1fr;
+  }
+
+  .edit-btn {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 </style>
