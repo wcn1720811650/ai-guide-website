@@ -4,13 +4,34 @@ const Post = require('../models/Post');
 // 获取帖子列表 (所有人可见)
 exports.getPosts = async (req, res) => {
   try {
-    const { tag } = req.query;
+    const { tag, sort, limit } = req.query;
     let query = { status: 'approved' };
     if (tag) {
       query.tags = tag; 
     }
-    
-    // 按时间倒序，最新的帖子在最前面
+
+    const sortMode = typeof sort === 'string' ? sort : 'latest';
+    if (sortMode === 'week_hot') {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      query.createdAt = { $gte: since };
+
+      const parsedLimit = typeof limit === 'string' ? Number.parseInt(limit, 10) : 50;
+      const safeLimit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+
+      const posts = await Post.aggregate([
+        { $match: query },
+        {
+          $addFields: {
+            likesCount: { $size: { $ifNull: ['$likes', []] } }
+          }
+        },
+        { $sort: { likesCount: -1, createdAt: -1 } },
+        { $limit: safeLimit }
+      ]);
+
+      return res.json(posts);
+    }
+
     const posts = await Post.find(query).sort({ createdAt: -1 });
     res.json(posts);
   } catch (error) {

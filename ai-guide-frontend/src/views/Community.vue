@@ -19,9 +19,24 @@
         </a-button>
       </div>
 
+      <a-tabs v-model:activeKey="activeTab" type="card" size="large" class="community-tabs" @change="handleTabChange">
+        <a-tab-pane key="week_hot" tab="本周最热" />
+        <a-tab-pane key="latest" tab="最新发布" />
+      </a-tabs>
+
       <div v-if="posts.length === 0" class="empty-state">
-        <span v-if="selectedTag">没有找到关于 "{{ selectedTag }}" 的内容哦~</span>
-        <span v-else>暂无内容，来做第一个分享灵感的人吧！</span>
+        <span v-if="selectedTag">
+          {{ activeTab === 'week_hot'
+            ? `本周还没有关于 "${selectedTag}" 的热门内容哦~`
+            : `没有找到关于 "${selectedTag}" 的内容哦~`
+          }}
+        </span>
+        <span v-else>
+          {{ activeTab === 'week_hot'
+            ? '本周暂无热门内容，去看看最新发布吧~'
+            : '暂无内容，来做第一个分享灵感的人吧！'
+          }}
+        </span>
       </div>
 
       <div class="post-list">
@@ -125,12 +140,20 @@ import axios from 'axios'
 const router = useRouter()
 const posts = ref<any[]>([])
 const loading = ref(true)
+const activeTab = ref<'week_hot' | 'latest'>('week_hot')
 
 // 弹窗与表单状态
 const isModalVisible = ref(false)
 const submitting = ref(false)
 const newPost = ref({ title: '', content: '', tags: [] }) 
 const selectedTag = ref('')
+
+const handleTabChange = (key: string) => {
+  if (key === 'week_hot' || key === 'latest') {
+    activeTab.value = key
+    fetchPosts()
+  }
+}
 
 // 获取当前登录用户ID
 const getCurrentUserId = () => {
@@ -189,11 +212,12 @@ const handleToggleLike = async (post: any) => {
 const fetchPosts = async () => {
   loading.value = true
   try {
-    const url = selectedTag.value 
-      ? `http://localhost:3000/api/posts?tag=${encodeURIComponent(selectedTag.value)}`
-      : 'http://localhost:3000/api/posts'
-      
-    const res = await axios.get(url)
+    const res = await axios.get('http://localhost:3000/api/posts', {
+      params: {
+        sort: activeTab.value,
+        tag: selectedTag.value || undefined
+      }
+    })
     posts.value = res.data
   } catch (error) {
     message.error('获取帖子失败')
@@ -273,6 +297,10 @@ onMounted(() => {
   margin-bottom: 32px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.community-tabs {
+  margin-bottom: 16px;
 }
 
 .page-title {
