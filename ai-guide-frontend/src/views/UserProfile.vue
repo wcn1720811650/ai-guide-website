@@ -1,9 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { UserOutlined, CalendarOutlined, LikeOutlined, FileTextOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
+import VChart from 'vue-echarts'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { BarChart, PieChart } from 'echarts/charts'
+import {
+  GridComponent,
+  LegendComponent,
+  TitleComponent,
+  TooltipComponent
+} from 'echarts/components'
+
+use([CanvasRenderer, BarChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent])
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +24,81 @@ const userInfo = ref<any>(null)
 const userStats = ref({ postCount: 0, totalLikes: 0 })
 const userPosts = ref<any[]>([])
 const loading = ref(true)
+
+const topPostsOption = computed(() => {
+  if (!userPosts.value.length) return null
+
+  const topPosts = [...userPosts.value]
+    .map((post) => ({
+      title: String(post.title ?? ''),
+      views: Number(post.views ?? 0),
+      likes: Array.isArray(post.likes) ? post.likes.length : 0
+    }))
+    .sort((a, b) => (b.views + b.likes) - (a.views + a.likes))
+    .slice(0, 5)
+    .reverse()
+
+  const titles = topPosts.map((p) => p.title)
+  const views = topPosts.map((p) => p.views)
+  const likes = topPosts.map((p) => p.likes)
+
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['浏览', '点赞'] },
+    grid: { left: 8, right: 16, top: 40, bottom: 8, containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: {
+      type: 'category',
+      data: titles,
+      axisLabel: {
+        formatter: (value: string) => (value.length > 10 ? `${value.slice(0, 10)}…` : value)
+      }
+    },
+    series: [
+      { name: '浏览', type: 'bar', data: views, itemStyle: { color: '#60a5fa' } },
+      { name: '点赞', type: 'bar', data: likes, itemStyle: { color: '#f472b6' } }
+    ]
+  }
+})
+
+const tagPieOption = computed(() => {
+  if (!userPosts.value.length) return null
+
+  const counts = new Map<string, number>()
+  for (const post of userPosts.value) {
+    const tags = Array.isArray(post.tags) ? post.tags : []
+    for (const rawTag of tags) {
+      const tag = String(rawTag || '').trim()
+      if (!tag) continue
+      counts.set(tag, (counts.get(tag) ?? 0) + 1)
+    }
+  }
+
+  const data = [...counts.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8)
+
+  if (!data.length) return null
+
+  return {
+    tooltip: { trigger: 'item' },
+    legend: { type: 'scroll', bottom: 0 },
+    series: [
+      {
+        name: '标签',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: true,
+        itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        emphasis: { label: { show: true, fontSize: 14, fontWeight: 700 } },
+        labelLine: { show: false },
+        data
+      }
+    ]
+  }
+})
 
 const fetchUserProfile = async () => {
   const userId = route.params.id
@@ -81,6 +168,26 @@ watch(
       </div>
 
       <div class="profile-content" v-if="userInfo">
+        <h2 class="section-title">数据看板</h2>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-title">浏览与点赞（Top 5）</div>
+            <div v-if="topPostsOption" class="chart-wrap">
+              <VChart class="chart" :option="topPostsOption" autoresize />
+            </div>
+            <div v-else class="chart-empty">暂无帖子数据可展示</div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-title">标签分布（Top 8）</div>
+            <div v-if="tagPieOption" class="chart-wrap">
+              <VChart class="chart" :option="tagPieOption" autoresize />
+            </div>
+            <div v-else class="chart-empty">暂无标签数据可展示</div>
+          </div>
+        </div>
+
         <h2 class="section-title">Ta 的发布</h2>
         
         <div v-if="userPosts.length === 0" class="empty-state">
@@ -187,6 +294,47 @@ watch(
   color: #111827;
 }
 
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #f3f4f6;
+  padding: 16px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.chart-wrap {
+  width: 100%;
+}
+
+.chart {
+  width: 100%;
+  height: 280px;
+}
+
+.chart-empty {
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  background: #fafafa;
+  border-radius: 10px;
+  border: 1px dashed #e5e7eb;
+}
+
 .post-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -247,6 +395,10 @@ watch(
   }
   .user-main {
     flex-direction: column;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
