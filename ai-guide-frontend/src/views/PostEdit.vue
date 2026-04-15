@@ -30,6 +30,14 @@
             <a-textarea v-model:value="form.content" :rows="12" placeholder="支持 Markdown 语法..." />
           </a-form-item>
 
+          <div class="ai-actions">
+            <div class="ai-tip">AI 辅助写作</div>
+            <a-space :size="8">
+              <a-button type="primary" class="ai-btn" :loading="aiPolishing" :disabled="loading" @click="aiPolish">AI 润色</a-button>
+              <a-button class="ai-btn" :loading="aiSummarizing" :disabled="loading" @click="aiSummarize">生成摘要</a-button>
+            </a-space>
+          </div>
+
           <div class="hint">
             修改后会重新进入审核流程，通过后才会展示给其他用户。
           </div>
@@ -56,6 +64,8 @@ const router = useRouter()
 
 const loading = ref(true)
 const submitting = ref(false)
+const aiPolishing = ref(false)
+const aiSummarizing = ref(false)
 
 const form = reactive({
   title: '',
@@ -133,6 +143,72 @@ const submit = async () => {
   }
 }
 
+const requireToken = () => {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    message.warning('请先登录后再使用 AI 功能')
+    router.push('/login')
+    return null
+  }
+  return token
+}
+
+const aiPolish = async () => {
+  const token = requireToken()
+  if (!token) return
+  if (!form.content.trim()) {
+    message.warning('请先写点内容再润色')
+    return
+  }
+  aiPolishing.value = true
+  try {
+    const res = await axios.post(
+      'http://localhost:3000/api/ai/post/polish',
+      { text: form.content },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    form.content = res.data.text
+    message.success('已完成润色')
+  } catch (e: any) {
+    message.error(e.response?.data?.message || '润色失败')
+  } finally {
+    aiPolishing.value = false
+  }
+}
+
+const aiSummarize = async () => {
+  const token = requireToken()
+  if (!token) return
+  if (!form.content.trim()) {
+    message.warning('请先写点内容再生成摘要')
+    return
+  }
+  aiSummarizing.value = true
+  try {
+    const res = await axios.post(
+      'http://localhost:3000/api/ai/post/summary',
+      { text: form.content },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const summary = String(res.data.summary || '').trim()
+    if (!summary) {
+      message.error('摘要生成失败')
+      return
+    }
+    const hasSummary = /^\s*摘要[:：]/m.test(form.content)
+    if (hasSummary) {
+      message.info('已检测到摘要段落，请手动替换')
+      return
+    }
+    form.content = `摘要：\n${summary}\n\n---\n\n${form.content}`
+    message.success('已生成摘要并插入到正文顶部')
+  } catch (e: any) {
+    message.error(e.response?.data?.message || '生成摘要失败')
+  } finally {
+    aiSummarizing.value = false
+  }
+}
+
 onMounted(fetchForEdit)
 </script>
 
@@ -170,6 +246,35 @@ onMounted(fetchForEdit)
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.ai-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.ai-tip {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.ai-btn {
+  border-radius: 10px;
+}
+
+.ai-btn.ant-btn-primary {
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+.ai-btn.ant-btn-primary:hover {
+  background-color: #34d399;
+  border-color: #34d399;
 }
 
 .hint {

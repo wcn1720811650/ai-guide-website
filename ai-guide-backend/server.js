@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/auth');
 const postRoutes = require('./routes/post');
 const userRoutes = require('./routes/user');
+const aiRoutes = require('./routes/ai')
 const Post = require('./models/Post')
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(express.json()); // 允许后端接收 JSON 格式的数据
 app.use('/api/user', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ==========================================
 // 2. 定义文章的数据模型 (Schema)
