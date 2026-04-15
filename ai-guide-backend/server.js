@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/auth');
 const postRoutes = require('./routes/post');
 const userRoutes = require('./routes/user');
+const Post = require('./models/Post')
 
 const app = express();
 const PORT = 3000;
@@ -53,8 +54,9 @@ mongoose.connect(process.env.MONGO_URI)
     console.log('🟢 成功连接到 MongoDB 云数据库！')
     try {
       await Article.syncIndexes()
+      await Post.syncIndexes()
     } catch (e) {
-      console.error('🔴 Article 索引同步失败:', e)
+      console.error('🔴 索引同步失败:', e)
     }
   })
   .catch(err => console.error('🔴 数据库连接失败:', err));

@@ -64,5 +64,13 @@ const postSchema = new mongoose.Schema({
   }
 });
 postSchema.index({ rejectedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
+postSchema.index(
+  { title: 'text', content: 'text', tags: 'text' },
+  {
+    name: 'post_text_index',
+    weights: { title: 10, tags: 4, content: 1 },
+    default_language: 'none'
+  }
+);
 
 module.exports = mongoose.model('Post', postSchema);

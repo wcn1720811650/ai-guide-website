@@ -19,17 +19,40 @@
         </a-button>
       </div>
 
+      <div v-if="keyword" class="filter-banner">
+        <span>正在搜索: <strong class="filter-highlight">{{ keyword }}</strong></span>
+        <a-button type="link" @click="clearKeyword" size="small" class="clear-btn">
+          清除搜索 ✖
+        </a-button>
+      </div>
+
       <a-tabs v-model:activeKey="activeTab" type="card" size="large" class="community-tabs" @change="handleTabChange">
         <a-tab-pane key="week_hot" tab="本周最热" />
         <a-tab-pane key="latest" tab="最新发布" />
       </a-tabs>
 
+      <div class="community-search">
+        <a-input-search
+          v-model:value="keywordInput"
+          allowClear
+          size="large"
+          placeholder="搜索社区帖子：标题 / 正文 / 标签"
+          @search="handleSearch"
+        />
+      </div>
+
       <div v-if="posts.length === 0" class="empty-state">
-        <span v-if="selectedTag">
+        <span v-if="selectedTag && keyword">
+          没有找到关于 "{{ selectedTag }}" 且包含 "{{ keyword }}" 的内容哦~
+        </span>
+        <span v-else-if="selectedTag">
           {{ activeTab === 'week_hot'
             ? `本周还没有关于 "${selectedTag}" 的热门内容哦~`
             : `没有找到关于 "${selectedTag}" 的内容哦~`
           }}
+        </span>
+        <span v-else-if="keyword">
+          没有找到包含 "{{ keyword }}" 的内容哦~
         </span>
         <span v-else>
           {{ activeTab === 'week_hot'
@@ -131,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { EyeOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue'
@@ -147,6 +170,10 @@ const isModalVisible = ref(false)
 const submitting = ref(false)
 const newPost = ref({ title: '', content: '', tags: [] }) 
 const selectedTag = ref('')
+
+const keywordInput = ref('')
+const keyword = ref('')
+let keywordTimeout: any = null
 
 const handleTabChange = (key: string) => {
   if (key === 'week_hot' || key === 'latest') {
@@ -215,7 +242,8 @@ const fetchPosts = async () => {
     const res = await axios.get('http://localhost:3000/api/posts', {
       params: {
         sort: activeTab.value,
-        tag: selectedTag.value || undefined
+        tag: selectedTag.value || undefined,
+        keyword: keyword.value || undefined
       }
     })
     posts.value = res.data
@@ -225,6 +253,36 @@ const fetchPosts = async () => {
     loading.value = false
   }
 }
+
+const handleSearch = () => {
+  keywordInput.value = keywordInput.value.trim()
+  keyword.value = keywordInput.value
+  fetchPosts()
+}
+
+const clearKeyword = () => {
+  keywordInput.value = ''
+  keyword.value = ''
+  fetchPosts()
+}
+
+watch(keywordInput, (val) => {
+  if (keywordTimeout) clearTimeout(keywordTimeout)
+  const next = (val || '').trim()
+
+  if (!next) {
+    if (keyword.value) {
+      keyword.value = ''
+      fetchPosts()
+    }
+    return
+  }
+
+  keywordTimeout = setTimeout(() => {
+    keyword.value = next
+    fetchPosts()
+  }, 400)
+})
 
 // 标签过滤点击
 const handleTagClick = (tag: string) => {
@@ -300,6 +358,10 @@ onMounted(() => {
 }
 
 .community-tabs {
+  margin-bottom: 16px;
+}
+
+.community-search {
   margin-bottom: 16px;
 }
 

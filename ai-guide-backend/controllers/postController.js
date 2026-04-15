@@ -7,11 +7,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here_super_safe';
 // 获取帖子列表 (所有人可见)
 exports.getPosts = async (req, res) => {
   try {
-    const { tag, sort, limit } = req.query;
+    const { tag, sort, limit, keyword } = req.query;
     let query = { status: 'approved' };
     if (tag) {
       query.tags = tag; 
     }
+
+    const keywordText = typeof keyword === 'string' ? keyword.trim() : ''
 
     const sortMode = typeof sort === 'string' ? sort : 'latest';
     if (sortMode === 'week_hot') {
@@ -21,8 +23,9 @@ exports.getPosts = async (req, res) => {
       const parsedLimit = typeof limit === 'string' ? Number.parseInt(limit, 10) : 50;
       const safeLimit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
 
-      const posts = await Post.aggregate([
-        { $match: query },
+      const filterText = keywordText ? { ...query, $text: { $search: keywordText } } : query
+      let posts = await Post.aggregate([
+        { $match: filterText },
         {
           $addFields: {
             likesCount: { $size: { $ifNull: ['$likes', []] } }
@@ -32,7 +35,45 @@ exports.getPosts = async (req, res) => {
         { $limit: safeLimit }
       ]);
 
+      if (keywordText && posts.length === 0) {
+        const filterRegex = {
+          ...query,
+          $or: [
+            { title: { $regex: keywordText, $options: 'i' } },
+            { content: { $regex: keywordText, $options: 'i' } },
+            { tags: { $regex: keywordText, $options: 'i' } }
+          ]
+        }
+        posts = await Post.aggregate([
+          { $match: filterRegex },
+          {
+            $addFields: {
+              likesCount: { $size: { $ifNull: ['$likes', []] } }
+            }
+          },
+          { $sort: { likesCount: -1, createdAt: -1 } },
+          { $limit: safeLimit }
+        ])
+      }
+
       return res.json(posts);
+    }
+
+    if (keywordText) {
+      const filterText = { ...query, $text: { $search: keywordText } }
+      let posts = await Post.find(filterText).sort({ createdAt: -1 })
+      if (posts.length === 0) {
+        const filterRegex = {
+          ...query,
+          $or: [
+            { title: { $regex: keywordText, $options: 'i' } },
+            { content: { $regex: keywordText, $options: 'i' } },
+            { tags: { $regex: keywordText, $options: 'i' } }
+          ]
+        }
+        posts = await Post.find(filterRegex).sort({ createdAt: -1 })
+      }
+      return res.json(posts)
     }
 
     const posts = await Post.find(query).sort({ createdAt: -1 });
