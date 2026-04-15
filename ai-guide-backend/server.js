@@ -16,12 +16,6 @@ app.use(express.json()); // 允许后端接收 JSON 格式的数据
 app.use('/api/user', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes);
-// ==========================================
-// 1. 连接云端数据库
-// ==========================================
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('🟢 成功连接到 MongoDB 云数据库！'))
-  .catch(err => console.error('🔴 数据库连接失败:', err));
 
 // ==========================================
 // 2. 定义文章的数据模型 (Schema)
@@ -32,14 +26,38 @@ const articleSchema = new mongoose.Schema({
   title: String,     // 标题
   desc: String,      // 简介
   content: String,   // 内容
+  tags: [String],    // 标签
   categoryId: String,// 分类
   date: String,      // 日期
   author: String,    // 作者
   views: Number      // 阅读量
 });
 
+articleSchema.index(
+  { title: 'text', desc: 'text', content: 'text', tags: 'text' },
+  {
+    name: 'article_text_index',
+    weights: { title: 10, desc: 6, tags: 4, content: 1 },
+    default_language: 'none'
+  }
+);
+
 // 生成操作文章的 Model（这就相当于操作数据库的遥控器）
 const Article = mongoose.model('Article', articleSchema);
+
+// ==========================================
+// 1. 连接云端数据库
+// ==========================================
+mongoose.connect(process.env.MONGO_URI)
+  .then(async () => {
+    console.log('🟢 成功连接到 MongoDB 云数据库！')
+    try {
+      await Article.syncIndexes()
+    } catch (e) {
+      console.error('🔴 Article 索引同步失败:', e)
+    }
+  })
+  .catch(err => console.error('🔴 数据库连接失败:', err));
 
 // 一个验证 token 的中间件
 const authMiddleware = (req, res, next) => {
@@ -70,31 +88,53 @@ app.get('/api/articles', async (req, res) => {
       filter.categoryId = category;
     }
 
-    // 2. 如果带有关键字，开启正则模糊搜索
-    if (keyword) {
-      filter.$or = [
-        // $regex 代表正则表达式，$options: 'i' 代表不区分大小写
-        { title: { $regex: keyword, $options: 'i' } }, 
-        { desc: { $regex: keyword, $options: 'i' } }
-      ];
-    }
-
     const skip = (parseInt(page) - 1) * parseInt(limit); // 计算跳过多少条数据
 
-    // 1. 查询当前页的数据
-    const articles = await Article.find(filter)
-      .sort({ _id: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-    
-    // 2. 查询总条数（为了让前端知道一共有多少页）
-    const total = await Article.countDocuments(filter);
+    const keywordText = typeof keyword === 'string' ? keyword.trim() : ''
+    const pageNum = parseInt(page)
+    const limitNum = parseInt(limit)
+
+    let articles = []
+    let total = 0
+
+    if (keywordText) {
+      const filterText = { ...filter, $text: { $search: keywordText } }
+      total = await Article.countDocuments(filterText)
+
+      if (total > 0) {
+        articles = await Article.find(filterText, { score: { $meta: 'textScore' } })
+          .sort({ score: { $meta: 'textScore' }, _id: -1 })
+          .skip(skip)
+          .limit(limitNum)
+      } else {
+        const filterRegex = {
+          ...filter,
+          $or: [
+            { title: { $regex: keywordText, $options: 'i' } },
+            { desc: { $regex: keywordText, $options: 'i' } },
+            { content: { $regex: keywordText, $options: 'i' } },
+            { tags: { $regex: keywordText, $options: 'i' } }
+          ]
+        }
+        total = await Article.countDocuments(filterRegex)
+        articles = await Article.find(filterRegex)
+          .sort({ _id: -1 })
+          .skip(skip)
+          .limit(limitNum)
+      }
+    } else {
+      total = await Article.countDocuments(filter)
+      articles = await Article.find(filter)
+        .sort({ _id: -1 })
+        .skip(skip)
+        .limit(limitNum)
+    }
     
     res.json({
       articles, // 当前页的数据
       total,    // 总条数
-      page: parseInt(page),
-      limit: parseInt(limit)
+      page: pageNum,
+      limit: limitNum
     });
   } catch (error) {
     res.status(500).json({ message: '服务器分页查询失败' });
